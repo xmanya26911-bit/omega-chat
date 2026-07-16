@@ -45,9 +45,9 @@ export function ChatArea() {
   const MODEL_LIST = [
     "deepseek-v4-flash-free",
     "mimo-v2.5-free",
-    "hy3-free",
     "nemotron-3-ultra-free",
     "north-mini-code-free",
+    "big-pickle",
   ];
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
