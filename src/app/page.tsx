@@ -4,8 +4,10 @@ import * as React from "react";
 import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { useOAuth } from "@/components/omega/hooks/use-oauth";
+import { useAuthStore } from "@/components/omega/store/auth-store";
 import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
+import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 
 /**
  * Loader — centered Ω with a soft pulse. Shown while the OAuth hook
@@ -48,7 +50,7 @@ function ChatLoader() {
 }
 
 /**
- * ChatPage — the auth-gated two-column layout. Renders only after the
+ * ChatShell — the auth-gated two-column layout. Renders only after the
  * OAuth hook resolves with an authenticated user.
  */
 function ChatShell() {
@@ -109,6 +111,9 @@ function ChatShell() {
           <ChatArea />
         </main>
       </div>
+
+      {/* ── Login overlay (z-80, above cursor) ── */}
+      <OmegaLogin />
     </div>
   );
 }
