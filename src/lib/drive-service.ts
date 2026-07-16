@@ -2,13 +2,15 @@
 // Uses the user's OAuth access token to save/load sessions
 // via the Google Drive REST API v3.
 
+import { getAccessToken } from "./access-token";
+
 const DRIVE_FOLDER = "omega-cloud";
 const SESSIONS_FILE = "omega_sessions_v1.json";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return (
-    window.__omega_access_token ||
+    getAccessToken() ||
     (document.cookie.match(/\bomega_at=([^;]*)/) || [])[1] ||
     null
   );
@@ -146,12 +148,5 @@ export async function checkDriveConnection(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
-  }
-}
-
-// Extend window type for the access token
-declare global {
-  interface Window {
-    __omega_access_token?: string;
   }
 }

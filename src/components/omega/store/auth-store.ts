@@ -1,5 +1,6 @@
 "use client";
 
+import { setAccessToken } from "@/lib/access-token";
 import { create } from "zustand";
 
 export interface OmegaUser {
@@ -39,7 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   setAccessToken: (t) => {
     if (typeof window !== "undefined" && t) {
-      window.__omega_access_token = t;
+      setAccessToken(t);
     }
     set({ accessToken: t });
   },
@@ -52,7 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem(REFRESH_KEY);
       localStorage.removeItem("omega_state");
       localStorage.removeItem("omega_verifier");
-      window.__omega_access_token = "";
+      setAccessToken(null);
     }
     set({ user: null, accessToken: null, loginOverlayOpen: false });
   },

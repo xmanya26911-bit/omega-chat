@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  reactStrictMode: false,
+  reactStrictMode: true,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "image.pollinations.ai" },

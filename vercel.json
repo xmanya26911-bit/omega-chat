@@ -10,13 +10,17 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "X-DNS-Prefetch-Control", "value": "on" }
+        { "key": "X-DNS-Prefetch-Control", "value": "on" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.googleusercontent.com https://lh3.googleusercontent.com https://pollinations.ai; connect-src 'self' https://oauth2.googleapis.com https://www.googleapis.com https://opencode.ai; frame-src 'self' https://accounts.google.com; object-src 'none'; base-uri 'self'"
+        }
       ]
     }
   ],
   "env": {
     "NEXT_PUBLIC_CHAT_APP_URL": "https://omega-chat-five.vercel.app",
-    "NEXT_PUBLIC_LANDING_APP_URL": "https://omega-nine-weld.vercel.app",
-    "GOOGLE_CLIENT_ID": "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com"
+    "NEXT_PUBLIC_LANDING_APP_URL": "https://omega-nine-weld.vercel.app"
   }
 }

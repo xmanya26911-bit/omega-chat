@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getAccessToken } from "@/lib/access-token";
 import { cn } from "@/lib/utils";
 
 const MAX_HEIGHT = 200;
@@ -154,10 +155,7 @@ export function ChatInput() {
     }
     setIsGeneratingImage(true);
     try {
-      const accessToken =
-        typeof window !== "undefined"
-          ? window.__omega_access_token ?? ""
-          : "";
+      const accessToken = getAccessToken();
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: {

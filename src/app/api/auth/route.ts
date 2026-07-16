@@ -6,15 +6,23 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "edge";
 
-const GOOGLE_CLIENT_ID =
-  "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
+const ALLOWED_ORIGINS = [
+  "https://omega-chat-five.vercel.app",
+  "https://omega-nine-weld.vercel.app",
+  process.env.NEXT_PUBLIC_CHAT_APP_URL,
+  process.env.NEXT_PUBLIC_LANDING_APP_URL,
+].filter(Boolean) as string[];
+
 function cors(origin: string) {
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : "https://omega-chat-five.vercel.app";
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
   };
 }
 

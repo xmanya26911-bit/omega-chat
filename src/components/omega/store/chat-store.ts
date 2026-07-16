@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { saveToDrive as driveSave, loadFromDrive as driveLoad } from "@/lib/drive-service";
+import { getAccessToken } from "@/lib/access-token";
 
 const STORAGE_KEY = "omega_sessions_v1";
 const DEFAULT_MODEL = "deepseek-v4-flash-free";
@@ -414,10 +415,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         .slice(-20)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const accessToken =
-        typeof window !== "undefined"
-          ? (window.__omega_access_token ?? "")
-          : "";
+      const accessToken = getAccessToken();
 
       try {
         const res = await fetch("/api/chat", {
@@ -552,10 +550,3 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
   };
 });
-
-// ── Window type extension ──────────────────────────────────────────────
-declare global {
-  interface Window {
-    __omega_access_token?: string;
-  }
-}
