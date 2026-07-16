@@ -152,6 +152,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Content moderation ──────────────────────────────────────────
+  // Blocks obviously illegal content to protect the platform.
+  // Pentesting, security research, and general coding are ALLOWED.
+  const MODERATION_BLOCKED = [
+    { pattern: /\b(malware|ransomware|trojan|worm|keylogger|rootkit|botnet)\s+(create|generate|write|build|code|develop|make|produce)\b/i, label: "malware generation" },
+    { pattern: /\b(how\s+to\s+)?(create|make|build|generate)\s+(child\s+porn|csam|cp\s+content)\b/i, label: "harmful content" },
+    { pattern: /\b(phishing|phish)\s+(kit|page|site|link|campaign|email|template|scam)\b/i, label: "phishing kit generation" },
+    { pattern: /\b(credit\s+card|cc\s+|dox|doxx|swat|swatting)\s+(generator|steal|stealer|bins|track)\b/i, label: "fraud tools" },
+    { pattern: /\b(exploit|vulnerability|cve)\s+(for\s+)?(sale|sell|buy|purchase)\b/i, label: "exploit trading" },
+  ];
+
+  for (const rule of MODERATION_BLOCKED) {
+    if (rule.pattern.test(message)) {
+      return new Response(
+        JSON.stringify({
+          error: `Content blocked: requests for ${rule.label} violate our acceptable use policy.`,
+          code: "CONTENT_BLOCKED",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
+
   // Prompt injection defense: rely on system prompt instruction to refuse
   // injection attempts. No regex-based sanitization (trivially bypassed).
   // Instead, wrap the user message with a delimiter so the model can

@@ -48,6 +48,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No prompt provided" }, { status: 400 });
   }
 
+  // Basic content moderation for image generation
+  const blockedImagePatterns = [
+    /\b(child\s+porn|csam|nude\s+child|underage)\b/i,
+    /\b(gore|beheading|torture|snuff)\b/i,
+    /\b(malware|ransomware)\s+(screenshot|interface|ui)\b/i,
+  ];
+  for (const p of blockedImagePatterns) {
+    if (p.test(prompt)) {
+      return NextResponse.json(
+        { error: "Prompt blocked by content policy" },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     // Use Pollinations.ai for free image generation
     const encodedPrompt = encodeURIComponent(prompt.trim());
