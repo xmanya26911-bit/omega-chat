@@ -61,6 +61,27 @@ export function ChatArea() {
     ? messages[messages.length - 1].content
     : "";
   const lastLen = lastContent.length;
+  const lastRole = messages.length
+    ? messages[messages.length - 1].role
+    : "";
+
+  // ── Auto-TTS for voice conversation mode ──────────────────────────
+  const [voiceMode, setVoiceModeLocal] = React.useState(false);
+  React.useEffect(() => {
+    if (!voiceMode) return;
+    // When streaming ends and the last message is from the assistant, speak it
+    if (!isStreaming && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last.role === "assistant" && last.content && "speechSynthesis" in window) {
+        // Cancel any ongoing speech, start new
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(last.content);
+        utterance.lang = "en-US";
+        utterance.rate = 1.05;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  }, [isStreaming, voiceMode, messages, messageCount]);
 
   // ── Auto-scroll handling ──────────────────────────────────────────
   const scrollToBottom = React.useCallback((behavior: ScrollBehavior = "smooth") => {

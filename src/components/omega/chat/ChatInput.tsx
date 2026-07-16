@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Mic,
+  Mic2,
   Paperclip,
   Square,
   X,
@@ -228,6 +229,8 @@ export function ChatInput() {
   const [isDragging, setIsDragging] = React.useState(false);
   const [attachments, setAttachments] = React.useState<FileAttachment[]>([]);
   const [recordingDuration, setRecordingDuration] = React.useState(0);
+  const [showTemplates, setShowTemplates] = React.useState(false);
+  const [voiceMode, setVoiceMode] = React.useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -250,6 +253,39 @@ export function ChatInput() {
   React.useEffect(() => {
     autoResize();
   }, [text, autoResize]);
+
+  // ── Voice conversation mode (full duplex loop) ────────────────
+  const voiceLoopRef = React.useRef(false);
+
+  const startVoiceLoop = React.useCallback(() => {
+    voiceLoopRef.current = true;
+    startListening();
+  }, [startListening]);
+
+  const stopVoiceLoop = React.useCallback(() => {
+    voiceLoopRef.current = false;
+    stopListening?.();
+  }, [stopListening]);
+
+  React.useEffect(() => {
+    if (!voiceMode) {
+      stopVoiceLoop();
+    }
+  }, [voiceMode, stopVoiceLoop]);
+
+  // After text changes in voice mode, auto-submit on silence
+  const lastTranscriptRef = React.useRef("");
+  React.useEffect(() => {
+    if (!voiceMode || !text || text === lastTranscriptRef.current) return;
+    lastTranscriptRef.current = text;
+    const timer = setTimeout(() => {
+      if (voiceMode && text.trim() && !isStreaming) {
+        handleSubmit();
+        // After submit, when response arrives, speak it
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [text, voiceMode, isStreaming]);
 
   // ── Recording timer ──────────────────────────────────────────
   React.useEffect(() => {
@@ -469,16 +505,7 @@ export function ChatInput() {
   // ── Voice input ─────────────────────────────────────────────
   const recognitionRef = React.useRef<any>(null);
 
-  const handleVoiceInput = () => {
-    if (isListening) {
-      setIsListening(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-        recognitionRef.current = null;
-      }
-      return;
-    }
-
+  const startListening = React.useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -489,30 +516,60 @@ export function ChatInput() {
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false;
 
     recognition.onresult = (event: any) => {
       let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
-      setText((prev) => {
-        // Replace the current line after the last voice input
-        return transcript;
-      });
+      setText(transcript);
     };
 
     recognition.onerror = () => {
       setIsListening(false);
+      // Retry in voice mode
+      if (voiceMode && voiceLoopRef.current) {
+        setTimeout(() => startListening(), 500);
+      }
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      // Auto-submit on silence, then restart in voice mode
+      if (voiceMode && voiceLoopRef.current) {
+        const el = textareaRef.current;
+        if (el && el.value.trim()) {
+          handleSubmit();
+          // Restart listening after a short delay (TTTS will handle response)
+          setTimeout(() => {
+            if (voiceMode && voiceLoopRef.current) startListening();
+          }, 3000);
+        } else {
+          setTimeout(() => startListening(), 500);
+        }
+      }
     };
 
     recognitionRef.current = recognition;
     setIsListening(true);
     recognition.start();
+  }, [voiceMode, handleSubmit]);
+
+  const stopListening = React.useCallback(() => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  const handleVoiceInput = () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    startListening();
   };
 
   // ── Format recording duration ───────────────────────────────
@@ -683,16 +740,15 @@ export function ChatInput() {
             )}
           </ToolbarButton>
 
-          {/* Recording indicator */}
-          {isListening && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              className="font-mono text-[10px] text-[var(--omega-rose)] tabular-nums px-1"
-            >
-              {fmtDuration}
-            </motion.span>
-          )}
+          {/* Voice conversation mode toggle */}
+          <ToolbarButton
+            aria-label="Toggle voice conversation mode"
+            tooltip={voiceMode ? "Voice conversation ON — speak, AI responds aloud" : "Voice conversation — speak & hear replies"}
+            active={voiceMode}
+            onClick={() => setVoiceMode(!voiceMode)}
+          >
+            <Mic2 className="size-4" strokeWidth={2} />
+          </ToolbarButton>
 
           {/* Spacer */}
           <div className="flex-1" />

@@ -113,6 +113,7 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   model: string;
+  pinned?: boolean;
 }
 
 export type ChatMode = "standard" | "research" | "coding" | "canvas" | "python";
@@ -137,6 +138,7 @@ interface ChatState {
   deleteSession: (id: string) => void;
   deleteMessage: (sessionId: string, messageId: string) => void;
   renameSession: (id: string, title: string) => void;
+  togglePin: (id: string) => void;
   setModel: (model: string) => void;
   setMode: (mode: ChatMode) => void;
   toggleSearch: () => void;
@@ -276,17 +278,35 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     deleteMessage: (sessionId, messageId) => {
       set((s) => {
-        const sess = s.sessions[sessionId];
-        if (!sess) return s;
+        const session = s.sessions[sessionId];
+        if (!session) return s;
         return {
           sessions: {
             ...s.sessions,
             [sessionId]: {
-              ...sess,
-              messages: sess.messages.filter((m) => m.id !== messageId),
+              ...session,
+              messages: session.messages.filter((m) => m.id !== messageId),
               updatedAt: Date.now(),
             },
           },
+        };
+      });
+      persistToLocal(get());
+      triggerSync();
+    },
+
+    togglePin: (id) => {
+      set((s) => {
+        const session = s.sessions[id];
+        if (!session) return s;
+        return {
+          sessions: {
+            ...s.sessions,
+            [id]: { ...session, pinned: !session.pinned },
+          },
+          sessionOrder: !session.pinned
+            ? [id, ...s.sessionOrder.filter((x) => x !== id)]
+            : s.sessionOrder,
         };
       });
       persistToLocal(get());

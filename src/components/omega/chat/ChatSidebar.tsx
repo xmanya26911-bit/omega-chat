@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings, Brain } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
@@ -41,20 +41,24 @@ interface SessionItemProps {
   title: string;
   updatedAt: number;
   active: boolean;
+  pinned?: boolean;
   query: string;
   snippet?: string;
   onSelect: () => void;
   onDelete: () => void;
+  onTogglePin: () => void;
 }
 
 function SessionItem({
   title,
   updatedAt,
   active,
+  pinned,
   query,
   snippet,
   onSelect,
   onDelete,
+  onTogglePin,
 }: SessionItemProps) {
 
   // Highlight matching text
@@ -118,14 +122,17 @@ function SessionItem({
         <div className="min-w-0 flex-1">
           <div
             className={cn(
-              "truncate text-sm",
-              active
-                ? "text-[var(--omega-fg)]"
-                : "text-[var(--omega-fg-dim)]"
-            )}
-          >
-            {title}
-          </div>
+                "truncate text-sm",
+                active
+                  ? "text-[var(--omega-fg)]"
+                  : "text-[var(--omega-fg-dim)]"
+              )}
+            >
+              {title}
+              {pinned && (
+                <Star className="ml-1.5 inline size-3 fill-[var(--omega-emerald)] text-[var(--omega-emerald)]" strokeWidth={2} />
+              )}
+            </div>
           <div className="mt-0.5 font-mono text-[10px] text-[var(--omega-muted)]">
             {relativeTime(updatedAt)}
           </div>
@@ -135,23 +142,30 @@ function SessionItem({
             </div>
           )}
         </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+          className="shrink-0 rounded-md p-1 text-[var(--omega-muted)] opacity-0 transition-all hover:text-[var(--omega-emerald)] group-hover:opacity-100 focus-visible:opacity-100"
+          aria-label={pinned ? "Unpin" : "Pin"}
+        >
+          <Star className={cn("size-3.5", pinned && "fill-[var(--omega-emerald)]")} strokeWidth={2} />
+        </button>
         <span
           role="button"
-          tabIndex={-1}
-          aria-label="Delete conversation"
-          data-cursor="hover"
+          tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          className={cn(
-            "inline-flex size-7 shrink-0 items-center justify-center rounded-md",
-            "text-[var(--omega-fg-dim)] opacity-0 transition-all duration-200",
-            "hover:bg-[oklch(0.7_0.21_14_/_0.16)] hover:text-[var(--omega-rose)]",
-            "group-hover:opacity-100 focus-visible:opacity-100"
-          )}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.stopPropagation();
+              onDelete();
+            }
+          }}
+          className="shrink-0 rounded-md p-1 text-[var(--omega-muted)] opacity-0 transition-all hover:text-[var(--omega-rose)] group-hover:opacity-100"
+          aria-label={`Delete conversation "${title}"`}
         >
-          <Trash2 className="size-3.5" strokeWidth={2} />
+          <X className="size-3.5" strokeWidth={2} />
         </span>
       </button>
     </motion.div>
@@ -169,6 +183,7 @@ export function ChatSidebar() {
   const newChat = useChatStore((s) => s.newChat);
   const loadSession = useChatStore((s) => s.loadSession);
   const deleteSession = useChatStore((s) => s.deleteSession);
+  const togglePin = useChatStore((s) => s.togglePin);
   const hydrateFromStorage = useChatStore((s) => s.hydrateFromStorage);
 
   const user = useAuthStore((s) => s.user);
@@ -181,6 +196,7 @@ export function ChatSidebar() {
   const [query, setQuery] = React.useState("");
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMemory, setShowMemory] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
   const hydratePrefs = usePrefsStore((s) => s.hydrate);
   const syncFromDrive = useMemoryStore((s) => s.syncFromDrive);
@@ -199,7 +215,11 @@ export function ChatSidebar() {
     const list = sessionOrder
       .map((id) => sessions[id])
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
-    if (!q) return list;
+    if (!q) return list.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return 0;
+    });
     return list.filter((s) => {
       if (s.title.toLowerCase().includes(q)) return true;
       return s.messages.some((m) =>
@@ -236,13 +256,32 @@ export function ChatSidebar() {
   const avatarUrl = user?.picture;
 
   return (
-    <aside
+    <motion.aside
+      layout
+      animate={{ width: sidebarOpen ? 280 : 0 }}
+      transition={{ type: "spring", stiffness: 400, damping: 35 }}
       className={cn(
-        "flex h-full w-[240px] shrink-0 flex-col sm:w-[280px]",
+        "flex h-full shrink-0 flex-col overflow-hidden",
         "omega-glass border-r border-[var(--omega-glass-border)]"
       )}
     >
-      {/* ── Brand header ─────────────────────────────────────────── */}
+      {/* Focus mode closed — thin strip */}
+      {!sidebarOpen && (
+        <div className="flex h-full w-0 items-start justify-center pt-4 overflow-visible">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="z-50 -ml-6 inline-flex size-7 items-center justify-center rounded-lg text-[var(--omega-muted)] hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)] transition-all bg-[var(--omega-bg)] border border-[var(--omega-glass-border)]"
+            aria-label="Open sidebar"
+          >
+            <PanelRightOpen className="size-4" strokeWidth={2} />
+          </button>
+        </div>
+      )}
+
+      {/* Full sidebar content */}
+      {sidebarOpen && (
+        <>{/* ── Brand header ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
         <div
           className="flex size-8 shrink-0 items-center justify-center rounded-full font-display text-base font-semibold text-[oklch(0.06_0.01_264)]"
@@ -262,6 +301,14 @@ export function ChatSidebar() {
             Cloud AI
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--omega-muted)] hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)] transition-all"
+          aria-label={sidebarOpen ? "Close sidebar (focus)" : "Open sidebar"}
+        >
+          <PanelRightClose className="size-4" strokeWidth={2} />
+        </button>
         <button
           type="button"
           onClick={() => setShowMemory(true)}
@@ -390,10 +437,12 @@ export function ChatSidebar() {
                   title={s.title}
                   updatedAt={s.updatedAt}
                   active={s.id === activeSession}
+                  pinned={s.pinned}
                   query={query}
                   snippet={snippet}
                   onSelect={() => loadSession(s.id)}
                   onDelete={() => deleteSession(s.id)}
+                  onTogglePin={() => togglePin(s.id)}
                 />
               );
             })}
@@ -539,9 +588,12 @@ export function ChatSidebar() {
             <LogOut className="size-4" strokeWidth={2} />
           </button>
         </div>
-      </div>
+      </div>{/* end user footer */}
 
-      {/* Settings dialog */}
+      {/* Close the full sidebar content wrapper */}
+      )}
+
+      {/* Settings dialog — always rendered */}
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Memory panel overlay */}
@@ -564,7 +616,7 @@ export function ChatSidebar() {
           </motion.aside>
         </div>
       )}
-    </aside>
+    </motion.aside>
   );
 }
 
