@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck, Trash2, Volume2 } from "lucide-react";
@@ -63,6 +65,69 @@ function CopyButton({ getText, className, label = "Copy code" }: CopyButtonProps
   );
 }
 
+// ── MermaidBlock — renders flowchart / sequence / Gantt diagrams ──────
+function MermaidBlock({ value }: { value: string }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Dynamic import to avoid bundle bloat
+        const { default: mermaid } = await import("mermaid");
+        if (cancelled) return;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "dark",
+          fontFamily: "var(--font-mono), monospace",
+          themeVariables: {
+            primaryColor: "oklch(0.82 0.17 162 / 0.2)",
+            primaryTextColor: "#e0e4f0",
+            primaryBorderColor: "oklch(0.82 0.17 162 / 0.4)",
+            lineColor: "oklch(0.82 0.17 162 / 0.5)",
+            secondaryColor: "oklch(0.2 0.012 264 / 0.6)",
+            tertiaryColor: "oklch(0.14 0.008 264 / 0.8)",
+          },
+        });
+        if (cancelled) return;
+        const id = "mermaid-" + Math.random().toString(36).slice(2, 8);
+        const { svg } = await mermaid.render(id, value);
+        if (!cancelled && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+        }
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message || "Render error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [value]);
+
+  if (error) {
+    return (
+      <div className="my-3 rounded-xl border border-[oklch(0.7_0.21_14_/_0.3)] bg-[oklch(0.7_0.21_14_/_0.06)] p-3 font-mono text-[11px] text-[var(--omega-rose)]">
+        Mermaid error: {error}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="my-3 h-24 animate-pulse rounded-xl bg-[oklch(0.14_0.008_264_/_0.6)]" />
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="my-3 flex justify-center overflow-x-auto rounded-xl bg-[oklch(0.1_0.01_264_/_0.4)] p-4"
+    />
+  );
+}
+
 // ── CodeBlock — memoized so streaming re-parses don't blow away state ─
 interface CodeBlockProps {
   language: string;
@@ -70,6 +135,11 @@ interface CodeBlockProps {
 }
 
 const CodeBlock = React.memo(function CodeBlock({ language, value }: CodeBlockProps) {
+  // Mermaid diagrams
+  if (language === "mermaid") {
+    return <MermaidBlock value={value} />;
+  }
+
   return (
     <div className="group/code relative my-3 overflow-hidden rounded-xl border border-[var(--omega-glass-border)]">
       {/* header bar */}
@@ -125,7 +195,10 @@ function StreamingDots() {
   );
 }
 
-// ── Markdown components (stable ref) ──────────────────────────────────
+// ── MD_COMPONENTS + plugins ──────────────────────────────────────────
+const REMARK_PLUGINS = [remarkMath];
+const REHYPE_PLUGINS = [rehypeKatex];
+
 const MD_COMPONENTS = {
   pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   code: ({
@@ -404,7 +477,11 @@ function MessageBubbleImpl({
             <StreamingDots />
           ) : (
             <div className="omega-prose break-words">
-              <ReactMarkdown components={MD_COMPONENTS as never}>
+              <ReactMarkdown
+                remarkPlugins={REMARK_PLUGINS}
+                rehypePlugins={REHYPE_PLUGINS}
+                components={MD_COMPONENTS as never}
+              >
                 {message.content}
               </ReactMarkdown>
             </div>
