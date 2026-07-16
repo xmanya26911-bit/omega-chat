@@ -4,10 +4,12 @@ import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ChatMessage } from "../store/chat-store";
+import { useChatStore } from "../store/chat-store";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ── CopyButton sub-component ──────────────────────────────────────────
 interface CopyButtonProps {
@@ -212,14 +214,20 @@ const MD_COMPONENTS = {
 // ── MessageBubble ─────────────────────────────────────────────────────
 interface MessageBubbleProps {
   message: ChatMessage;
-  isStreaming?: boolean; // global streaming state
+  isStreaming?: boolean;
   isLast?: boolean;
+  onRegenerate?: (messageId: string) => void;
+  onEdit?: (messageId: string, newText: string) => void;
+  onFeedback?: (messageId: string, type: "positive" | "negative") => void;
 }
 
 function MessageBubbleImpl({
   message,
   isStreaming = false,
   isLast = false,
+  onRegenerate,
+  onEdit,
+  onFeedback,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isError = message.error === true;
@@ -230,6 +238,25 @@ function MessageBubbleImpl({
     isStreaming &&
     message.content.length === 0;
 
+  const [editing, setEditing] = React.useState(false);
+  const [editText, setEditText] = React.useState(message.content);
+  const [feedback, setFeedback] = React.useState<"positive" | "negative" | null>(null);
+
+  const handleCopy = React.useCallback(() => {
+    navigator.clipboard.writeText(message.content);
+  }, [message.content]);
+
+  const handleEdit = () => {
+    if (editText.trim() && editText !== message.content) {
+      onEdit?.(message.id, editText.trim());
+    }
+    setEditing(false);
+  };
+
+  const handleRegenerate = () => {
+    onRegenerate?.(message.id);
+  }; 
+
   // ── USER ──────────────────────────────────────────────────────────
   if (isUser) {
     return (
@@ -238,18 +265,63 @@ function MessageBubbleImpl({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 26 }}
-        className="flex w-full justify-end"
+        className="flex w-full flex-col items-end gap-2"
       >
-        <div
-          className={cn(
-            "omega-glass-thin max-w-[80%] rounded-2xl rounded-br-sm p-4 text-sm",
-            "border-[oklch(0.82_0.17_162_/_0.18)] text-[var(--omega-fg)]"
-          )}
-        >
-          <p className="whitespace-pre-wrap break-words leading-relaxed">
-            {message.content}
-          </p>
-        </div>
+        {editing ? (
+          <div className="omega-glass-thin w-full max-w-[80%] rounded-2xl rounded-tr-sm p-3 border-[oklch(0.82_0.17_162_/_0.18)]">
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="w-full bg-transparent text-sm text-[var(--omega-fg)] resize-none focus:outline-none min-h-[60px]"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleEdit();
+                }
+                if (e.key === "Escape") {
+                  setEditing(false);
+                  setEditText(message.content);
+                }
+              }}
+            />
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                onClick={() => { setEditing(false); setEditText(message.content); }}
+                className="px-3 py-1.5 text-xs text-[var(--omega-fg-dim)] hover:bg-[var(--omega-glass-border)] rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEdit}
+                disabled={!editText.trim()}
+                className="px-3 py-1.5 text-xs font-medium bg-[var(--omega-emerald)] text-[oklch(0.06_0.01_264)] rounded-lg hover:opacity-90 transition disabled:opacity-40"
+              >
+                Save & Send
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="group flex items-end gap-2">
+            <div
+              className={cn(
+                "omega-glass-thin max-w-[80%] rounded-2xl rounded-br-sm p-4 text-sm",
+                "border-[oklch(0.82_0.17_162_/_0.18)] text-[var(--omega-fg)]"
+              )}
+            >
+              <p className="whitespace-pre-wrap break-words leading-relaxed">
+                {message.content}
+              </p>
+            </div>
+            <button
+              onClick={() => { setEditing(true); setEditText(message.content); }}
+              className="size-8 shrink-0 rounded-lg opacity-0 group-hover:opacity-100 transition-all text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)]"
+              aria-label="Edit message"
+            >
+              <Pencil className="size-4" strokeWidth={2} />
+            </button>
+          </div>
+        )}
       </motion.div>
     );
   }
@@ -261,57 +333,168 @@ function MessageBubbleImpl({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
-      className="flex w-full justify-start gap-3"
+      className="flex w-full flex-col gap-2"
     >
-      {/* avatar */}
-      <div
-        className={cn(
-          "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full font-display text-sm font-semibold",
-          isError
-            ? "text-[var(--omega-rose)]"
-            : "text-[oklch(0.06_0.01_264)]"
-        )}
-        style={{
-          background: isError
-            ? "oklch(0.7 0.21 14 / 0.18)"
-            : "var(--omega-emerald)",
-          boxShadow: isError
-            ? "0 0 18px -4px oklch(0.7 0.21 14 / 0.6)"
-            : "0 0 18px -4px oklch(0.82 0.17 162 / 0.55)",
-        }}
-        aria-hidden
-      >
-        Ω
+      <div className="flex w-full justify-start gap-3">
+        {/* avatar */}
+        <div
+          className={cn(
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full font-display text-sm font-semibold",
+            isError
+              ? "text-[var(--omega-rose)]"
+              : "text-[oklch(0.06_0.01_264)]"
+          )}
+          style={{
+            background: isError
+              ? "oklch(0.7 0.21 14 / 0.18)"
+              : "var(--omega-emerald)",
+            boxShadow: isError
+              ? "0 0 18px -4px oklch(0.7 0.21 14 / 0.6)"
+              : "0 0 18px -4px oklch(0.82 0.17 162 / 0.55)",
+          }}
+          aria-hidden
+        >
+          Ω
+        </div>
+
+        <div
+          className={cn(
+            "max-w-[88%] rounded-2xl p-4 text-sm",
+            isError
+              ? "border border-[oklch(0.7_0.21_14_/_0.35)] border-l-2 bg-[oklch(0.7_0.21_14_/_0.06)] text-[var(--omega-rose)]"
+              : "text-[var(--omega-fg)]"
+          )}
+          style={
+            isError
+              ? { borderLeftColor: "var(--omega-rose)", borderLeftWidth: "3px" }
+              : undefined
+          }
+        >
+          {showLoader ? (
+            <StreamingDots />
+          ) : (
+            <div className="omega-prose break-words">
+              <ReactMarkdown components={MD_COMPONENTS as never}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
+          {isAssistant && !isError && message.model && (
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--omega-muted)]">
+              {message.model}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div
-        className={cn(
-          "max-w-[88%] rounded-2xl p-4 text-sm",
-          isError
-            ? "border border-[oklch(0.7_0.21_14_/_0.35)] border-l-2 bg-[oklch(0.7_0.21_14_/_0.06)] text-[var(--omega-rose)]"
-            : "text-[var(--omega-fg)]"
-        )}
-        style={
-          isError
-            ? { borderLeftColor: "var(--omega-rose)", borderLeftWidth: "3px" }
-            : undefined
-        }
-      >
-        {showLoader ? (
-          <StreamingDots />
-        ) : (
-          <div className="omega-prose break-words">
-            <ReactMarkdown components={MD_COMPONENTS as never}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        )}
-        {isAssistant && !isError && message.model && (
-          <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--omega-muted)]">
-            {message.model}
-          </div>
-        )}
-      </div>
+      {/* Action buttons */}
+      {!isError && !showLoader && (
+        <div className="flex items-center gap-1.5 pl-14">
+          {isAssistant && onRegenerate && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleRegenerate}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)] transition"
+                  aria-label="Regenerate response"
+                >
+                  <RefreshCw className="size-3.5" strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                Regenerate
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {!isUser && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleCopy?.()}
+                    className="inline-flex size-7 items-center justify-center rounded-md text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)] transition"
+                    aria-label="Copy message"
+                  >
+                    <Copy className="size-3.5" strokeWidth={2} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                  Copy
+                </TooltipContent>
+              </Tooltip>
+
+              {onFeedback && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          const fb = feedback === "positive" ? null : "positive";
+                          setFeedback(fb);
+                          onFeedback(message.id, fb!);
+                        }}
+                        className={cn(
+                          "inline-flex size-7 items-center justify-center rounded-md transition",
+                          feedback === "positive"
+                            ? "text-green-500 hover:bg-green-500/10"
+                            : "text-[var(--omega-muted)] hover:text-green-500 hover:bg-[var(--omega-glass-border)]"
+                        )}
+                        aria-label="Like response"
+                      >
+                        <ThumbsUp className="size-3.5" strokeWidth={2} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                      {feedback === "positive" ? "Liked" : "Like"}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          const fb = feedback === "negative" ? null : "negative";
+                          setFeedback(fb);
+                          onFeedback(message.id, fb!);
+                        }}
+                        className={cn(
+                          "inline-flex size-7 items-center justify-center rounded-md transition",
+                          feedback === "negative"
+                            ? "text-red-500 hover:bg-red-500/10"
+                            : "text-[var(--omega-muted)] hover:text-red-500 hover:bg-[var(--omega-glass-border)]"
+                        )}
+                        aria-label="Dislike response"
+                      >
+                        <ThumbsDown className="size-3.5" strokeWidth={2} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                      Dislike
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      const text = message.content;
+                      navigator.clipboard.writeText(text);
+                    }}
+                    className="inline-flex size-7 items-center justify-center rounded-md text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)] transition"
+                    aria-label="Share"
+                  >
+                    <Share2 className="size-3.5" strokeWidth={2} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                  Share
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
