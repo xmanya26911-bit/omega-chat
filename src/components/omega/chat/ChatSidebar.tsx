@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
 import { ModelSelect } from "./ModelSelect";
 import { cn } from "@/lib/utils";
+import { SettingsDialog } from "./SettingsDialog";
+import { usePrefsStore } from "../store/prefs-store";
 
 // ── Relative time formatter ───────────────────────────────────────────
 function relativeTime(ts: number): string {
@@ -137,13 +139,17 @@ export function ChatSidebar() {
   const loadFromDrive = useChatStore((s) => s.loadFromDrive);
 
   const [query, setQuery] = React.useState("");
+  const [showSettings, setShowSettings] = React.useState(false);
+
+  const hydratePrefs = usePrefsStore((s) => s.hydrate);
 
   // Restore sessions from localStorage on mount, then auto-load from Drive.
   React.useEffect(() => {
     hydrateFromStorage();
     // Auto-load from Drive if connected
     loadFromDrive();
-  }, [hydrateFromStorage, loadFromDrive]);
+    hydratePrefs();
+  }, [hydrateFromStorage, loadFromDrive, hydratePrefs]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -200,7 +206,7 @@ export function ChatSidebar() {
         >
           Ω
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-display text-sm font-semibold tracking-tight text-[var(--omega-fg)]">
             Omega
           </div>
@@ -208,6 +214,14 @@ export function ChatSidebar() {
             Cloud AI
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--omega-muted)] hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)] transition-all"
+          aria-label="Settings"
+        >
+          <Settings className="size-4" strokeWidth={2} />
+        </button>
       </div>
 
       {/* ── Home link ──────────────────────────────────────────────── */}
@@ -452,6 +466,9 @@ export function ChatSidebar() {
           </button>
         </div>
       </div>
+
+      {/* Settings dialog */}
+      <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
     </aside>
   );
 }

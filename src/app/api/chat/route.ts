@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let { message, model, conversationHistory, mode } = body;
+  let { message, model, conversationHistory, mode, customInstructions, temperature } = body;
 
   if (!message || typeof message !== "string") {
     return new Response(
@@ -228,12 +228,16 @@ export async function POST(request: NextRequest) {
                   new Date().toUTCString() +
                   " (UTC).",
               },
+              ...(customInstructions
+                ? [{ role: "system" as const, content: customInstructions }]
+                : []),
               { role: "system", content: userContext },
               ...(conversationHistory || []).slice(-20),
               { role: "user", content: sanitized || "[empty message]" },
             ],
             stream: true,
             max_tokens: 8192,
+            ...(typeof temperature === "number" ? { temperature } : {}),
           }),
         });
 

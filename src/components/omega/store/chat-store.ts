@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { saveToDrive as driveSave, loadFromDrive as driveLoad } from "@/lib/drive-service";
 import { getAccessToken } from "@/lib/access-token";
+import { usePrefsStore } from "../store/prefs-store";
 
 const STORAGE_KEY = "omega_sessions_v1";
 const DEFAULT_MODEL = "deepseek-v4-flash-free";
@@ -430,6 +431,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       set({ abortController: ac });
 
       const { currentModel, searchEnabled, currentMode, sessions } = get();
+      const prefs = usePrefsStore.getState();
       const history = sessions[sessionId].messages
         .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
         .slice(-20)
@@ -442,7 +444,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: *** ${accessToken}`,
           },
           body: JSON.stringify({
             message: trimmed,
@@ -451,6 +453,8 @@ export const useChatStore = create<ChatState>((set, get) => {
             searchEnabled,
             mode: currentMode,
             conversationHistory: history,
+            customInstructions: prefs.customInstructions || undefined,
+            temperature: prefs.temperature ?? 0.7,
           }),
           signal: ac.signal,
         });
