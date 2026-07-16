@@ -9,6 +9,9 @@ import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
 import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 
+// Force dynamic rendering - this page needs client-side auth state
+export const dynamic = "force-dynamic";
+
 /**
  * Loader — centered Ω with a soft pulse. Shown while the OAuth hook
  * restores the session from the stored refresh token.
