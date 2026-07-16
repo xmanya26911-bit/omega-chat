@@ -12,7 +12,7 @@ import {
   Square,
   X,
   FileText,
-  ImagePlus,
+  Camera,
 } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -638,7 +638,7 @@ export function ChatInput() {
             tooltip="Upload image"
             onClick={() => imageInputRef.current?.click()}
           >
-            <ImagePlus className="size-4" strokeWidth={2} />
+            <Camera className="size-4" strokeWidth={2} />
           </ToolbarButton>
 
           <ToolbarButton
