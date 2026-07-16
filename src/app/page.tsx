@@ -81,7 +81,6 @@ function ChatShell() {
   }, [ready, user]);
 
   if (!ready) return <ChatLoader />;
-  if (!user) return <ChatLoader />;
 
   return (
     <div
