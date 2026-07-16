@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let { message, model, conversationHistory, mode, customInstructions, temperature } = body;
+  let { message, model, conversationHistory, mode, customInstructions, temperature, memories } = body;
 
   if (!message || typeof message !== "string") {
     return new Response(
@@ -230,6 +230,9 @@ export async function POST(request: NextRequest) {
               },
               ...(customInstructions
                 ? [{ role: "system" as const, content: customInstructions }]
+                : []),
+              ...(memories
+                ? [{ role: "system" as const, content: memories }]
                 : []),
               { role: "system", content: userContext },
               ...(conversationHistory || []).slice(-20),

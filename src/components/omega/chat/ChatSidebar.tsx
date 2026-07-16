@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings, Brain } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
 import { ModelSelect } from "./ModelSelect";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
+import { MemoryManager } from "./MemoryManager";
+import { useMemoryStore } from "../store/memory-store";
 import { usePrefsStore } from "../store/prefs-store";
 
 // ── Relative time formatter ───────────────────────────────────────────
@@ -178,8 +180,10 @@ export function ChatSidebar() {
 
   const [query, setQuery] = React.useState("");
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showMemory, setShowMemory] = React.useState(false);
 
   const hydratePrefs = usePrefsStore((s) => s.hydrate);
+  const syncFromDrive = useMemoryStore((s) => s.syncFromDrive);
 
   // Restore sessions from localStorage on mount, then auto-load from Drive.
   React.useEffect(() => {
@@ -187,7 +191,8 @@ export function ChatSidebar() {
     // Auto-load from Drive if connected
     loadFromDrive();
     hydratePrefs();
-  }, [hydrateFromStorage, loadFromDrive, hydratePrefs]);
+    syncFromDrive();
+  }, [hydrateFromStorage, loadFromDrive, hydratePrefs, syncFromDrive]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -257,6 +262,14 @@ export function ChatSidebar() {
             Cloud AI
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowMemory(true)}
+          className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--omega-muted)] hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)] transition-all"
+          aria-label="Memory"
+        >
+          <Brain className="size-4" strokeWidth={2} />
+        </button>
         <button
           type="button"
           onClick={() => setShowSettings(true)}
@@ -530,6 +543,27 @@ export function ChatSidebar() {
 
       {/* Settings dialog */}
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* Memory panel overlay */}
+      {showMemory && (
+        <div
+          className="fixed inset-0 z-[100] flex"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMemory(false);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <motion.aside
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative z-10 h-full w-80 bg-[var(--omega-bg-2)] border-r border-[var(--omega-glass-border)] shadow-xl"
+          >
+            <MemoryManager onClose={() => setShowMemory(false)} />
+          </motion.aside>
+        </div>
+      )}
     </aside>
   );
 }

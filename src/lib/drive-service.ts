@@ -6,6 +6,7 @@ import { getAccessToken } from "./access-token";
 
 const DRIVE_FOLDER = "omega-cloud";
 const SESSIONS_FILE = "omega_sessions_v1.json";
+const MEMORIES_FILE = "omega_memories_v1.json";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -59,12 +60,13 @@ async function ensureDriveFolder(): Promise<string> {
   return created.id;
 }
 
-/** Find the sessions file in the drive folder. */
-async function findSessionsFile(
-  folderId: string
+/** Find a file in the drive folder by name. */
+async function findFile(
+  folderId: string,
+  fileName: string
 ): Promise<{ id: string; name: string } | null> {
   const q = encodeURIComponent(
-    `name='${SESSIONS_FILE}' and '${folderId}' in parents and trashed=false`
+    `name='${fileName}' and '${folderId}' in parents and trashed=false`
   );
   const res = await driveFetch(
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`
@@ -73,16 +75,14 @@ async function findSessionsFile(
   return data.files?.[0] || null;
 }
 
-/** Save data to Google Drive. Creates or updates the sessions JSON file. */
-export async function saveToDrive(data: unknown): Promise<boolean> {
+/** Generic file saver. */
+async function saveDataToDrive(data: unknown, fileName: string): Promise<boolean> {
   try {
     const folderId = await ensureDriveFolder();
-    const existing = await findSessionsFile(folderId);
+    const existing = await findFile(folderId, fileName);
     const body = JSON.stringify(data, null, 2);
-    const blob = new Blob([body], { type: "application/json" });
 
     if (existing) {
-      // Update existing file
       await driveFetch(
         `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`,
         {
@@ -92,9 +92,8 @@ export async function saveToDrive(data: unknown): Promise<boolean> {
         }
       );
     } else {
-      // Create new file
       const metadata = JSON.stringify({
-        name: SESSIONS_FILE,
+        name: fileName,
         parents: [folderId],
       });
       const formData = new FormData();
@@ -102,7 +101,7 @@ export async function saveToDrive(data: unknown): Promise<boolean> {
         "metadata",
         new Blob([metadata], { type: "application/json" })
       );
-      formData.append("file", blob);
+      formData.append("file", new Blob([body], { type: "application/json" }));
 
       await driveFetch(
         "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
@@ -114,16 +113,16 @@ export async function saveToDrive(data: unknown): Promise<boolean> {
     }
     return true;
   } catch (err) {
-    console.error("Drive save failed:", err);
+    console.error(`Drive save failed (${fileName}):`, err);
     return false;
   }
 }
 
-/** Load data from Google Drive. Returns null if no file or error. */
-export async function loadFromDrive<T = unknown>(): Promise<T | null> {
+/** Generic file loader. */
+async function loadDataFromDrive<T = unknown>(fileName: string): Promise<T | null> {
   try {
     const folderId = await ensureDriveFolder();
-    const existing = await findSessionsFile(folderId);
+    const existing = await findFile(folderId, fileName);
     if (!existing) return null;
 
     const res = await driveFetch(
@@ -132,9 +131,29 @@ export async function loadFromDrive<T = unknown>(): Promise<T | null> {
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch (err) {
-    console.error("Drive load failed:", err);
+    console.error(`Drive load failed (${fileName}):`, err);
     return null;
   }
+}
+
+/** Save data to Google Drive. Creates or updates the sessions JSON file. */
+export async function saveToDrive(data: unknown): Promise<boolean> {
+  return saveDataToDrive(data, SESSIONS_FILE);
+}
+
+/** Load data from Google Drive. Returns null if no file or error. */
+export async function loadFromDrive<T = unknown>(): Promise<T | null> {
+  return loadDataFromDrive<T>(SESSIONS_FILE);
+}
+
+/** Save memories to Google Drive. */
+export async function saveMemoriesToDrive(data: unknown): Promise<boolean> {
+  return saveDataToDrive(data, MEMORIES_FILE);
+}
+
+/** Load memories from Google Drive. */
+export async function loadMemoriesFromDrive<T = unknown>(): Promise<T | null> {
+  return loadDataFromDrive<T>(MEMORIES_FILE);
 }
 
 /** Check if Drive is connected (token exists + API reachable). */

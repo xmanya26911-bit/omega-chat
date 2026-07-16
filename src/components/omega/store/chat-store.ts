@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { saveToDrive as driveSave, loadFromDrive as driveLoad } from "@/lib/drive-service";
 import { getAccessToken } from "@/lib/access-token";
 import { usePrefsStore } from "../store/prefs-store";
+import { useMemoryStore } from "../store/memory-store";
 
 const STORAGE_KEY = "omega_sessions_v1";
 const DEFAULT_MODEL = "deepseek-v4-flash-free";
@@ -432,6 +433,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       const { currentModel, searchEnabled, currentMode, sessions } = get();
       const prefs = usePrefsStore.getState();
+      const memories = useMemoryStore.getState().getMemoriesForPrompt();
       const history = sessions[sessionId].messages
         .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
         .slice(-20)
@@ -455,6 +457,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             conversationHistory: history,
             customInstructions: prefs.customInstructions || undefined,
             temperature: prefs.temperature ?? 0.7,
+            memories: memories || undefined,
           }),
           signal: ac.signal,
         });
