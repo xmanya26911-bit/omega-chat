@@ -3,19 +3,53 @@
 import { create } from "zustand";
 import { saveToDrive as driveSave, loadFromDrive as driveLoad } from "@/lib/drive-service";
 
-let driveSaveTimer: ReturnType<typeof setTimeout> | null = null;
-const DEBOUNCE_MS = 3000;
+const STORAGE_KEY = "omega_sessions_v1";
+const DEFAULT_MODEL = "deepseek-v4-flash-free";
+const SYNC_DEBOUNCE = 1500;  // 1.5s debounce after any change
+const POLL_INTERVAL = 30000; // check for remote changes every 30s
 
-function scheduleDriveSave(state: ChatState) {
-  if (driveSaveTimer) clearTimeout(driveSaveTimer);
-  if (!state.activeSession) return;
-  driveSaveTimer = setTimeout(() => {
-    const { sessions, sessionOrder, activeSession, currentModel } =
-      useChatStore.getState();
-    driveSave({ sessions, sessionOrder, activeSession, currentModel }).then((ok) => {
-      useChatStore.setState({ driveStatus: ok ? "connected" : "error" });
-    });
-  }, DEBOUNCE_MS);
+// ── Helpers ────────────────────────────────────────────────────────────
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function loadSessions(): {
+  sessions: Record<string, ChatSession>;
+  order: string[];
+} {
+  if (typeof window === "undefined") return { sessions: {}, order: [] };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { sessions: {}, order: [] };
+    const parsed = JSON.parse(raw) as {
+      sessions: Record<string, ChatSession>;
+      order: string[];
+    };
+    return {
+      sessions: parsed.sessions || {},
+      order: parsed.order || [],
+    };
+  } catch {
+    return { sessions: {}, order: [] };
+  }
+}
+
+function persistToLocal(state: ChatState) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        sessions: state.sessions,
+        order: state.sessionOrder,
+        active: state.activeSession,
+        model: state.currentModel,
+      })
+    );
+  } catch {
+    /* quota */
+  }
 }
 
 // Generates an AI title from the first few messages
@@ -57,6 +91,7 @@ async function generateSessionTitle(
 }
 
 // ── Types ──────────────────────────────────────────────────────────────
+
 export type Role = "user" | "assistant" | "system" | "error";
 
 export interface ChatMessage {
@@ -89,7 +124,7 @@ interface ChatState {
   searchEnabled: boolean;
   abortController: AbortController | null;
   driveStatus: "idle" | "saving" | "loading" | "connected" | "error";
-  messageCount: number;
+  lastSynced: number | null;
 
   // actions
   newChat: () => string;
@@ -108,401 +143,417 @@ interface ChatState {
   loadFromDrive: () => Promise<void>;
 }
 
-const STORAGE_KEY = "omega_sessions_v1";
-const DEFAULT_MODEL = "deepseek-v4-flash-free";
-const AUTO_SAVE_INTERVAL = 3; // save to Drive every N messages
+// ── Store ──────────────────────────────────────────────────────────────
 
-function uid() {
-  return (
-    Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-  );
-}
+export const useChatStore = create<ChatState>((set, get) => {
+  // ══ Auto-sync: debounced Drive save on every state change ═════════
+  let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
-function loadSessions(): {
-  sessions: Record<string, ChatSession>;
-  order: string[];
-} {
-  if (typeof window === "undefined") return { sessions: {}, order: [] };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { sessions: {}, order: [] };
-    const parsed = JSON.parse(raw) as {
-      sessions: Record<string, ChatSession>;
-      order: string[];
-    };
-    return {
-      sessions: parsed.sessions || {},
-      order: parsed.order || [],
-    };
-  } catch {
-    return { sessions: {}, order: [] };
-  }
-}
-
-function persist(state: ChatState) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
+  const triggerSync = () => {
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(async () => {
+      const state = useChatStore.getState();
+      if (Object.keys(state.sessions).length === 0) return;
+      const ok = await driveSave({
         sessions: state.sessions,
-        order: state.sessionOrder,
-        active: state.activeSession,
-        model: state.currentModel,
-      })
-    );
-  } catch {
-    /* quota */
-  }
-}
+        sessionOrder: state.sessionOrder,
+        activeSession: state.activeSession,
+        currentModel: state.currentModel,
+      });
+      set({ driveStatus: ok ? "connected" : "error", lastSynced: Date.now() });
+    }, SYNC_DEBOUNCE);
+  };
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  sessions: {},
-  sessionOrder: [],
-  activeSession: null,
-  currentModel: DEFAULT_MODEL,
-  currentMode: "standard",
-  isStreaming: false,
-  searchEnabled: false,
-  abortController: null,
-  driveStatus: "idle",
-  messageCount: 0,
+  // ══ Poll for remote changes ════════════════════════════════════════
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  newChat: () => {
-    const id = uid();
-    const session: ChatSession = {
-      id,
-      title: "New chat",
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      model: get().currentModel,
-    };
-    set((s) => ({
-      sessions: { ...s.sessions, [id]: session },
-      sessionOrder: [id, ...s.sessionOrder],
-      activeSession: id,
-    }));
-    persist(get());
-    scheduleDriveSave(get());
-    return id;
-  },
-
-  setActiveSession: (id) => {
-    set({ activeSession: id });
-    persist(get());
-  },
-
-  loadSession: (id) => {
-    if (!get().sessions[id]) return;
-    set({ activeSession: id });
-    persist(get());
-    scheduleDriveSave(get());
-  },
-
-  deleteSession: (id) => {
-    set((s) => {
-      const sessions = { ...s.sessions };
-      delete sessions[id];
-      const order = s.sessionOrder.filter((x) => x !== id);
-      const active =
-        s.activeSession === id ? order[0] ?? null : s.activeSession;
-      return { sessions, sessionOrder: order, activeSession: active };
-    });
-    persist(get());
-    scheduleDriveSave(get());
-  },
-
-  renameSession: (id, title) => {
-    set((s) => {
-      const sess = s.sessions[id];
-      if (!sess) return s;
-      return {
-        sessions: { ...s.sessions, [id]: { ...sess, title } },
-      };
-    });
-    persist(get());
-    scheduleDriveSave(get());
-  },
-
-  setModel: (model) => {
-    set({ currentModel: model });
-    const { activeSession, sessions } = get();
-    if (activeSession && sessions[activeSession]) {
-      set((s) => ({
-        sessions: {
-          ...s.sessions,
-          [activeSession]: { ...s.sessions[activeSession], model },
-        },
-      }));
-    }
-    persist(get());
-  },
-
-  setMode: (mode) => set({ currentMode: mode }),
-  toggleSearch: () => set((s) => ({ searchEnabled: !s.searchEnabled })),
-
-  hydrateFromStorage: () => {
-    const { sessions, order } = loadSessions();
-    set((s) => ({
-      sessions: { ...s.sessions, ...sessions },
-      sessionOrder: Array.from(new Set([...order, ...s.sessionOrder])),
-      activeSession: s.activeSession ?? order[0] ?? null,
-    }));
-  },
-
-  clearAll: () => {
-    if (typeof window !== "undefined")
-      localStorage.removeItem(STORAGE_KEY);
-    set({
-      sessions: {},
-      sessionOrder: [],
-      activeSession: null,
-      isStreaming: false,
-    });
-  },
-
-  stopGeneration: () => {
-    const ac = get().abortController;
-    if (ac) ac.abort();
-    set({ isStreaming: false, abortController: null });
-  },
-
-  saveToDrive: async () => {
-    set({ driveStatus: "saving" });
-    try {
-      const { sessions, sessionOrder, activeSession, currentModel } = get();
-      const ok = await driveSave({ sessions, sessionOrder, activeSession, currentModel });
-      set({ driveStatus: ok ? "connected" : "error" });
-      return ok;
-    } catch {
-      set({ driveStatus: "error" });
-      return false;
-    }
-  },
-
-  loadFromDrive: async () => {
-    set({ driveStatus: "loading" });
-    try {
+  const startPolling = () => {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
       const data = await driveLoad<{
         sessions: Record<string, ChatSession>;
         sessionOrder: string[];
         activeSession: string | null;
         currentModel: string;
       }>();
-      if (data && data.sessions) {
+      if (!data?.sessions) return;
+      const state = useChatStore.getState();
+      const remoteMax = Math.max(
+        ...Object.values(data.sessions).map((s) => s.updatedAt),
+        0
+      );
+      const localMax = Math.max(
+        ...Object.values(state.sessions).map((s) => s.updatedAt),
+        0
+      );
+      if (remoteMax > localMax) {
         set({
           sessions: data.sessions,
-          sessionOrder: data.sessionOrder || [],
-          activeSession: data.activeSession || null,
-          currentModel: data.currentModel || DEFAULT_MODEL,
+          sessionOrder: data.sessionOrder || state.sessionOrder,
+          currentModel: data.currentModel || state.currentModel,
           driveStatus: "connected",
         });
-        persist(get());
-      } else {
-        set({ driveStatus: "idle" });
+        persistToLocal(get());
       }
-    } catch {
-      set({ driveStatus: "error" });
+    }, POLL_INTERVAL);
+  };
+
+  // Start polling on first use (triggered by hydrate)
+  const originalHydrate = () => {
+    const { sessions, order } = loadSessions();
+    set((s) => ({
+      sessions: { ...s.sessions, ...sessions },
+      sessionOrder: Array.from(new Set([...order, ...s.sessionOrder])),
+      activeSession: s.activeSession ?? order[0] ?? null,
+    }));
+    // Start polling on the client side
+    if (typeof window !== "undefined") {
+      startPolling();
     }
-  },
+  };
 
-  sendMessage: async (text, opts) => {
-    const trimmed = text.trim();
-    if (!trimmed || get().isStreaming) return;
+  return {
+    sessions: {},
+    sessionOrder: [],
+    activeSession: null,
+    currentModel: DEFAULT_MODEL,
+    currentMode: "standard",
+    isStreaming: false,
+    searchEnabled: false,
+    abortController: null,
+    driveStatus: "idle",
+    lastSynced: null,
 
-    // ensure a session exists
-    let sessionId = get().activeSession;
-    if (!sessionId || !get().sessions[sessionId]) {
-      sessionId = get().newChat();
-    }
+    // ── Actions ──────────────────────────────────────────────────────
 
-    const userMsg: ChatMessage = {
-      id: uid(),
-      role: "user",
-      content: trimmed,
-      createdAt: Date.now(),
-    };
-    const assistantMsg: ChatMessage = {
-      id: uid(),
-      role: "assistant",
-      content: "",
-      createdAt: Date.now(),
-      model: get().currentModel,
-    };
-
-    const wasEmpty = get().sessions[sessionId]?.messages.length === 0;
-
-    set((s) => {
-      const sess = s.sessions[sessionId!];
-      if (!sess) return s;
-      const updated: ChatSession = {
-        ...sess,
-        messages: [...sess.messages, userMsg, assistantMsg],
+    newChat: () => {
+      const id = uid();
+      const session: ChatSession = {
+        id,
+        title: "New chat",
+        messages: [],
+        createdAt: Date.now(),
         updatedAt: Date.now(),
-        title:
-          sess.messages.length === 0
-            ? trimmed.slice(0, 40) + (trimmed.length > 40 ? "…" : "")
-            : sess.title,
+        model: get().currentModel,
       };
-      return {
-        sessions: { ...s.sessions, [sessionId!]: updated },
-        isStreaming: true,
-      };
-    });
-    persist(get());
+      set((s) => ({
+        sessions: { ...s.sessions, [id]: session },
+        sessionOrder: [id, ...s.sessionOrder],
+        activeSession: id,
+      }));
+      persistToLocal(get());
+      triggerSync();
+      return id;
+    },
 
-    const ac = new AbortController();
-    set({ abortController: ac });
+    setActiveSession: (id) => {
+      set({ activeSession: id });
+      persistToLocal(get());
+    },
 
-    const { currentModel, searchEnabled, currentMode, sessions } = get();
-    const history = sessions[sessionId].messages
-      .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
-      .slice(-20)
-      .map((m) => ({ role: m.role, content: m.content }));
+    loadSession: (id) => {
+      if (!get().sessions[id]) return;
+      set({ activeSession: id });
+      persistToLocal(get());
+    },
 
-    const accessToken =
-      typeof window !== "undefined"
-        ? (window.__omega_access_token ?? "")
-        : "";
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          message: trimmed,
-          model: currentModel,
-          sessionId,
-          searchEnabled,
-          mode: currentMode,
-          conversationHistory: history,
-        }),
-        signal: ac.signal,
+    deleteSession: (id) => {
+      set((s) => {
+        const sessions = { ...s.sessions };
+        delete sessions[id];
+        const order = s.sessionOrder.filter((x) => x !== id);
+        const active =
+          s.activeSession === id ? order[0] ?? null : s.activeSession;
+        return { sessions, sessionOrder: order, activeSession: active };
       });
+      persistToLocal(get());
+      triggerSync();
+    },
 
-      if (res.status === 401) {
-        opts?.onAuthError?.();
-        throw new Error("Session expired. Please sign in again.");
+    renameSession: (id, title) => {
+      set((s) => {
+        const sess = s.sessions[id];
+        if (!sess) return s;
+        return {
+          sessions: { ...s.sessions, [id]: { ...sess, title } },
+        };
+      });
+      persistToLocal(get());
+      triggerSync();
+    },
+
+    setModel: (model) => {
+      set({ currentModel: model });
+      const { activeSession, sessions } = get();
+      if (activeSession && sessions[activeSession]) {
+        set((s) => ({
+          sessions: {
+            ...s.sessions,
+            [activeSession]: { ...s.sessions[activeSession], model },
+          },
+        }));
       }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Request failed (${res.status})`);
+      persistToLocal(get());
+      triggerSync();
+    },
+
+    setMode: (mode) => set({ currentMode: mode }),
+    toggleSearch: () => set((s) => ({ searchEnabled: !s.searchEnabled })),
+
+    hydrateFromStorage: originalHydrate,
+
+    clearAll: () => {
+      if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
+      set({
+        sessions: {},
+        sessionOrder: [],
+        activeSession: null,
+        isStreaming: false,
+      });
+    },
+
+    stopGeneration: () => {
+      const ac = get().abortController;
+      if (ac) ac.abort();
+      set({ isStreaming: false, abortController: null });
+    },
+
+    saveToDrive: async () => {
+      set({ driveStatus: "saving" });
+      try {
+        const { sessions, sessionOrder, activeSession, currentModel } = get();
+        const ok = await driveSave({ sessions, sessionOrder, activeSession, currentModel });
+        set({ driveStatus: ok ? "connected" : "error", lastSynced: ok ? Date.now() : undefined });
+        return ok;
+      } catch {
+        set({ driveStatus: "error" });
+        return false;
+      }
+    },
+
+    loadFromDrive: async () => {
+      set({ driveStatus: "loading" });
+      try {
+        const data = await driveLoad<{
+          sessions: Record<string, ChatSession>;
+          sessionOrder: string[];
+          activeSession: string | null;
+          currentModel: string;
+        }>();
+        if (data && data.sessions) {
+          set({
+            sessions: data.sessions,
+            sessionOrder: data.sessionOrder || [],
+            activeSession: data.activeSession || null,
+            currentModel: data.currentModel || DEFAULT_MODEL,
+            driveStatus: "connected",
+            lastSynced: Date.now(),
+          });
+          persistToLocal(get());
+        } else {
+          set({ driveStatus: "idle" });
+        }
+      } catch {
+        set({ driveStatus: "error" });
+      }
+    },
+
+    // ── sendMessage ──────────────────────────────────────────────────
+
+    sendMessage: async (text, opts) => {
+      const trimmed = text.trim();
+      if (!trimmed || get().isStreaming) return;
+
+      // ensure a session exists
+      let sessionId = get().activeSession;
+      if (!sessionId || !get().sessions[sessionId]) {
+        sessionId = get().newChat();
       }
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let acc = "";
+      const userMsg: ChatMessage = {
+        id: uid(),
+        role: "user",
+        content: trimmed,
+        createdAt: Date.now(),
+      };
+      const assistantMsg: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+        model: get().currentModel,
+      };
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            const t = line.trim();
-            if (!t.startsWith("data:")) continue;
-            const payload = t.slice(5).trim();
-            if (payload === "[DONE]") continue;
-            try {
-              const evt = JSON.parse(payload);
-              if (evt.type === "delta" && evt.content) {
-                acc += evt.content;
-                set((s) => {
-                  const sess = s.sessions[sessionId!];
-                  if (!sess) return s;
-                  const msgs = sess.messages.map((m) =>
-                    m.id === assistantMsg.id ? { ...m, content: acc } : m
-                  );
-                  return {
-                    sessions: {
-                      ...s.sessions,
-                      [sessionId!]: { ...sess, messages: msgs },
-                    },
-                  };
-                });
-              } else if (evt.type === "error") {
-                throw new Error(evt.content || "Stream error");
+      const wasEmpty = get().sessions[sessionId]?.messages.length === 0;
+
+      set((s) => {
+        const sess = s.sessions[sessionId!];
+        if (!sess) return s;
+        const updated: ChatSession = {
+          ...sess,
+          messages: [...sess.messages, userMsg, assistantMsg],
+          updatedAt: Date.now(),
+          title:
+            sess.messages.length === 0
+              ? trimmed.slice(0, 40) + (trimmed.length > 40 ? "…" : "")
+              : sess.title,
+        };
+        return {
+          sessions: { ...s.sessions, [sessionId!]: updated },
+          isStreaming: true,
+        };
+      });
+      persistToLocal(get());
+
+      const ac = new AbortController();
+      set({ abortController: ac });
+
+      const { currentModel, searchEnabled, currentMode, sessions } = get();
+      const history = sessions[sessionId].messages
+        .filter((m) => m.id !== userMsg.id && m.id !== assistantMsg.id)
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const accessToken =
+        typeof window !== "undefined"
+          ? (window.__omega_access_token ?? "")
+          : "";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            message: trimmed,
+            model: currentModel,
+            sessionId,
+            searchEnabled,
+            mode: currentMode,
+            conversationHistory: history,
+          }),
+          signal: ac.signal,
+        });
+
+        if (res.status === 401) {
+          opts?.onAuthError?.();
+          throw new Error("Session expired. Please sign in again.");
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Request failed (${res.status})`);
+        }
+
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let acc = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              const t = line.trim();
+              if (!t.startsWith("data:")) continue;
+              const payload = t.slice(5).trim();
+              if (payload === "[DONE]") continue;
+              try {
+                const evt = JSON.parse(payload);
+                if (evt.type === "delta" && evt.content) {
+                  acc += evt.content;
+                  set((s) => {
+                    const sess = s.sessions[sessionId!];
+                    if (!sess) return s;
+                    const msgs = sess.messages.map((m) =>
+                      m.id === assistantMsg.id ? { ...m, content: acc } : m
+                    );
+                    return {
+                      sessions: {
+                        ...s.sessions,
+                        [sessionId!]: { ...sess, messages: msgs },
+                      },
+                    };
+                  });
+                } else if (evt.type === "error") {
+                  throw new Error(evt.content || "Stream error");
+                }
+              } catch {
+                /* ignore malformed line */
               }
-            } catch {
-              /* ignore malformed line */
             }
           }
+        } else {
+          const data = await res.json();
+          acc = data.content || data.choices?.[0]?.message?.content || "";
+          set((s) => {
+            const sess = s.sessions[sessionId!];
+            if (!sess) return s;
+            const msgs = sess.messages.map((m) =>
+              m.id === assistantMsg.id ? { ...m, content: acc } : m
+            );
+            return {
+              sessions: {
+                ...s.sessions,
+                [sessionId!]: { ...sess, messages: msgs },
+              },
+            };
+          });
         }
-      } else {
-        const data = await res.json();
-        acc = data.content || data.choices?.[0]?.message?.content || "";
-        set((s) => {
-          const sess = s.sessions[sessionId!];
-          if (!sess) return s;
-          const msgs = sess.messages.map((m) =>
-            m.id === assistantMsg.id ? { ...m, content: acc } : m
-          );
-          return {
-            sessions: {
-              ...s.sessions,
-              [sessionId!]: { ...sess, messages: msgs },
-            },
-          };
-        });
-      }
 
-      if (!acc) {
-        set((s) => {
-          const sess = s.sessions[sessionId!];
-          if (!sess) return s;
-          const msgs = sess.messages.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: "_(no response)_", error: true }
-              : m
-          );
-          return {
-            sessions: { ...s.sessions, [sessionId!]: { ...sess, messages: msgs } },
-          };
-        });
+        if (!acc) {
+          set((s) => {
+            const sess = s.sessions[sessionId!];
+            if (!sess) return s;
+            const msgs = sess.messages.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: "_(no response)_", error: true }
+                : m
+            );
+            return {
+              sessions: { ...s.sessions, [sessionId!]: { ...sess, messages: msgs } },
+            };
+          });
+        }
+      } catch (e) {
+        const err = e as Error;
+        if (err.name === "AbortError") {
+          // keep partial content
+        } else {
+          set((s) => {
+            const sess = s.sessions[sessionId!];
+            if (!sess) return s;
+            const msgs = sess.messages.map((m) =>
+              m.id === assistantMsg.id
+                ? { ...m, content: `⚠️ ${err.message}`, error: true }
+                : m
+            );
+            return {
+              sessions: { ...s.sessions, [sessionId!]: { ...sess, messages: msgs } },
+            };
+          });
+        }
+      } finally {
+        set({ isStreaming: false, abortController: null });
+        persistToLocal(get());
+        // Trigger Drive sync after every message
+        triggerSync();
+        // Generate AI title after first response if session was empty
+        if (wasEmpty && acc && acc.length > 3) {
+          const msgs = get().sessions[sessionId]?.messages ?? [];
+          generateSessionTitle(sessionId, msgs);
+        }
       }
-    } catch (e) {
-      const err = e as Error;
-      if (err.name === "AbortError") {
-        // keep partial content
-      } else {
-        set((s) => {
-          const sess = s.sessions[sessionId!];
-          if (!sess) return s;
-          const msgs = sess.messages.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: `⚠️ ${err.message}`, error: true }
-              : m
-          );
-          return {
-            sessions: { ...s.sessions, [sessionId!]: { ...sess, messages: msgs } },
-          };
-        });
-      }
-    } finally {
-      const newCount = get().messageCount + 1;
-      set({ isStreaming: false, abortController: null, messageCount: newCount });
-      persist(get());
-      // Auto-save to Drive every N messages
-      if (newCount % AUTO_SAVE_INTERVAL === 0) {
-        scheduleDriveSave(get());
-      }
-      // Generate AI title after first response if session was empty
-      if (wasEmpty && acc && acc.length > 3) {
-        const msgs = get().sessions[sessionId]?.messages ?? [];
-        generateSessionTitle(sessionId, msgs);
-      }
-    }
-  },
-}));
+    },
+  };
+});
 
-// Global holder for the in-memory access token (set by use-oauth on login).
+// ── Window type extension ──────────────────────────────────────────────
 declare global {
   interface Window {
     __omega_access_token?: string;

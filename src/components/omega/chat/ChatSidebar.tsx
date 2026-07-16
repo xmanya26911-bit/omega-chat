@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, Download, LogOut, Plus, Search, Trash2, Upload, Monitor, ChevronDown } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Monitor, ChevronDown } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
@@ -132,9 +132,8 @@ export function ChatSidebar() {
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
 
-  const saveToDrive = useChatStore((s) => s.saveToDrive);
-  const loadFromDrive = useChatStore((s) => s.loadFromDrive);
   const driveStatus = useChatStore((s) => s.driveStatus);
+  const lastSynced = useChatStore((s) => s.lastSynced);
 
   const [query, setQuery] = React.useState("");
   const [showPCRemote, setShowPCRemote] = React.useState(true);
@@ -294,73 +293,64 @@ export function ChatSidebar() {
       {/* ── Drive sync ────────────────────────────────────────────── */}
       <div className="border-t border-[var(--omega-glass-border)] px-3 py-2">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            data-cursor="hover"
-            aria-label="Save to Google Drive"
-            disabled={driveStatus === "saving"}
-            onClick={() => { saveToDrive(); }}
+          <div
             className={cn(
-              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-mono",
-              "transition-all duration-200",
-              "hover:bg-[oklch(0.82_0.17_162_/_0.1)] hover:text-[var(--omega-emerald)]",
-              "disabled:opacity-40",
-              "text-[var(--omega-fg-dim)]"
-            )}
-          >
-            {driveStatus === "saving" ? (
-              <span className="size-3.5 animate-pulse rounded-full border border-[var(--omega-emerald)]" />
-            ) : (
-              <Upload className="size-3.5" strokeWidth={2} />
-            )}
-            Save
-          </button>
-          <button
-            type="button"
-            data-cursor="hover"
-            aria-label="Load from Google Drive"
-            disabled={driveStatus === "loading"}
-            onClick={() => { loadFromDrive(); }}
-            className={cn(
-              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-mono",
-              "transition-all duration-200",
-              "hover:bg-[oklch(0.82_0.17_162_/_0.1)] hover:text-[var(--omega-emerald)]",
-              "disabled:opacity-40",
-              "text-[var(--omega-fg-dim)]"
-            )}
-          >
-            {driveStatus === "loading" ? (
-              <span className="size-3.5 animate-pulse rounded-full border border-[var(--omega-emerald)]" />
-            ) : (
-              <Download className="size-3.5" strokeWidth={2} />
-            )}
-            Load
-          </button>
-          <span
-            className={cn(
-              "inline-flex size-6 items-center justify-center",
+              "inline-flex flex-1 items-center gap-2 rounded-lg px-2.5 py-1.5",
               driveStatus === "connected"
-                ? "text-[var(--omega-emerald)]"
+                ? "bg-[oklch(0.82_0.17_162_/_0.08)]"
                 : driveStatus === "error"
-                  ? "text-[var(--omega-rose)]"
-                  : "text-[var(--omega-muted)]"
+                  ? "bg-[oklch(0.7_0.21_14_/_0.08)]"
+                  : "omega-glass-thin"
             )}
-            title={
-              driveStatus === "connected"
-                ? "Drive connected"
-                : driveStatus === "error"
-                  ? "Drive error"
-                  : "Drive idle"
-            }
           >
-            {driveStatus === "connected" ? (
-              <Cloud className="size-3.5" strokeWidth={2} />
-            ) : driveStatus === "error" ? (
-              <CloudOff className="size-3.5" strokeWidth={2} />
-            ) : (
-              <Cloud className="size-3.5 opacity-50" strokeWidth={2} />
+            {/* Status dot */}
+            <span
+              className={cn(
+                "relative size-2 shrink-0 rounded-full",
+                driveStatus === "connected"
+                  ? "bg-[var(--omega-emerald)]"
+                  : driveStatus === "error"
+                    ? "bg-[var(--omega-rose)]"
+                    : driveStatus === "saving" || driveStatus === "loading"
+                      ? "bg-[var(--omega-emerald)] animate-pulse"
+                      : "bg-[var(--omega-muted)]"
+              )}
+            >
+              {driveStatus === "connected" && (
+                <span
+                  className="absolute inset-0 animate-ping rounded-full bg-[var(--omega-emerald)] opacity-40"
+                  style={{ animationDuration: "3s" }}
+                />
+              )}
+            </span>
+
+            {/* Status text */}
+            <span className="flex-1 font-mono text-[10px] text-[var(--omega-fg-dim)]">
+              {driveStatus === "saving"
+                ? "Saving…"
+                : driveStatus === "loading"
+                  ? "Loading…"
+                  : driveStatus === "connected"
+                    ? "Synced"
+                    : driveStatus === "error"
+                      ? "Sync error"
+                      : "Drive"}
+            </span>
+
+            {/* Last synced time */}
+            {lastSynced && driveStatus === "connected" && (
+              <span className="font-mono text-[9px] text-[var(--omega-muted)]">
+                {relativeTime(lastSynced)}
+              </span>
             )}
-          </span>
+
+            {/* Icon */}
+            {driveStatus === "error" ? (
+              <CloudOff className="size-3 shrink-0 text-[var(--omega-rose)]" strokeWidth={2} />
+            ) : (
+              <Cloud className="size-3 shrink-0 text-[var(--omega-emerald)]" strokeWidth={2} />
+            )}
+          </div>
         </div>
       </div>
 
