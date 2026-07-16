@@ -131,17 +131,19 @@ export function useOAuth() {
     let cancelled = false;
 
     async function init() {
+      console.log('[useOAuth] init start');
       // 1. Check for OAuth redirect (?code= in URL)
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
       const incomingState = url.searchParams.get("state");
 
       if (code) {
+        console.log('[useOAuth] code found in URL');
         const storedState = sessionStorage.getItem("omega_state");
         const verifier = sessionStorage.getItem("omega_verifier");
         // CSRF check
         if (!storedState || storedState !== incomingState || !verifier) {
-          // clean URL and bail
+          console.log('[useOAuth] CSRF check failed');
           history.replaceState(null, "", "/");
           if (!cancelled) setReady(true);
           return;
@@ -158,10 +160,11 @@ export function useOAuth() {
           setUser(u);
           sessionStorage.removeItem("omega_state");
           sessionStorage.removeItem("omega_verifier");
-          // clean URL → /chat
           history.replaceState(null, "", "/chat");
           setReady(true);
-        } catch {
+          console.log('[useOAuth] OAuth success, ready=true');
+        } catch (err) {
+          console.error('[useOAuth] OAuth error:', err);
           history.replaceState(null, "", "/");
           if (!cancelled) setReady(true);
         }
@@ -169,6 +172,7 @@ export function useOAuth() {
       }
 
       // 2. No code → try restore from stored user + refresh token
+      console.log('[useOAuth] No code, trying restore');
       const storedUser = localStorage.getItem("omega_user");
       const refreshToken = localStorage.getItem(REFRESH_KEY);
       if (storedUser && refreshToken) {
@@ -178,8 +182,9 @@ export function useOAuth() {
           setAccessToken(fresh);
           setUser(JSON.parse(storedUser) as OmegaUser);
           setReady(true);
-        } catch {
-          // refresh failed → clear, show login
+          console.log('[useOAuth] Restored from refresh token');
+        } catch (err) {
+          console.error('[useOAuth] Refresh failed:', err);
           localStorage.removeItem("omega_user");
           localStorage.removeItem(REFRESH_KEY);
           setUser(null);
@@ -187,6 +192,7 @@ export function useOAuth() {
           setReady(true);
         }
       } else {
+        console.log('[useOAuth] No stored session, ready=true');
         setReady(true);
       }
     }
