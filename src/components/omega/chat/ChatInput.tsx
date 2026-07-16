@@ -14,6 +14,8 @@ import {
   X,
   FileText,
   Camera,
+  Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -221,6 +223,16 @@ function DragOverlay({ visible }: { visible: boolean }) {
   );
 }
 
+// ── Prompt templates ──────────────────────────────────────────────────
+const TEMPLATES: { id: string; label: string; icon: string; prompt: string }[] = [
+  { id: "explain", label: "Explain this", icon: "💡", prompt: "Explain this in simple terms:" },
+  { id: "code", label: "Write code", icon: "💻", prompt: "Write code for:" },
+  { id: "fix", label: "Fix grammar", icon: "✏️", prompt: "Fix the grammar in this text:" },
+  { id: "summarize", label: "Summarize", icon: "📝", prompt: "Summarize this concisely:" },
+  { id: "brainstorm", label: "Brainstorm ideas", icon: "🧠", prompt: "Brainstorm ideas for:" },
+  { id: "translate", label: "Translate", icon: "🌍", prompt: "Translate this to English:" },
+];
+
 // ── ChatInput ──────────────────────────────────────────────────────
 export function ChatInput() {
   const [text, setText] = React.useState("");
@@ -231,6 +243,8 @@ export function ChatInput() {
   const [recordingDuration, setRecordingDuration] = React.useState(0);
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [voiceMode, setVoiceMode] = React.useState(false);
+  const [undoData, setUndoData] = React.useState<{ text: string; attachments: FileAttachment[] } | null>(null);
+  const undoRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -306,6 +320,22 @@ export function ChatInput() {
 
   const canSend = (text.trim().length > 0 || attachments.length > 0) && !isStreaming;
 
+  // ── Auto web search for time-sensitive queries ──────────────────
+  React.useEffect(() => {
+    if (!text.trim() || searchEnabled) return;
+    const timeKeywords = [
+      "latest", "news", "today", "current", "2024", "2025", "2026",
+      "breaking", "recent", "this week", "this month", "weather",
+      "stock", "price", "crypto", "bitcoin", "president", "election",
+      "score", "match", "game", "release", "update", "new",
+    ];
+    const lower = text.toLowerCase();
+    const matchCount = timeKeywords.filter((kw) => lower.includes(kw)).length;
+    if (matchCount >= 2) {
+      toggleSearch();
+    }
+  }, [text]);
+
   // ── Send ────────────────────────────────────────────────────
   const handleSubmit = () => {
     if (!canSend) return;
@@ -325,6 +355,9 @@ export function ChatInput() {
 
     setText("");
     setAttachments([]);
+    setUndoData({ text, attachments });
+    if (undoRef.current) clearTimeout(undoRef.current);
+    undoRef.current = setTimeout(() => setUndoData(null), 5000);
     requestAnimationFrame(() => {
       const el = textareaRef.current;
       if (el) el.style.height = "auto";
@@ -333,6 +366,27 @@ export function ChatInput() {
       onAuthError: () => {},
     });
   };
+
+  const handleUndo = React.useCallback(() => {
+    if (!undoData) return;
+    setText(undoData.text);
+    setAttachments(undoData.attachments);
+    setUndoData(null);
+    if (undoRef.current) clearTimeout(undoRef.current);
+    undoRef.current = null;
+    // Also delete last assistant message from the active session
+    const state = useChatStore.getState();
+    const session = state.activeSession ? state.sessions[state.activeSession] : null;
+    if (session && session.messages.length >= 2) {
+      // Remove last user + assistant pair
+      const lastUser = session.messages[session.messages.length - 2];
+      const lastAssistant = session.messages[session.messages.length - 1];
+      if (lastUser.role === "user" && lastAssistant.role === "assistant") {
+        state.deleteMessage(state.activeSession!, lastAssistant.id);
+        state.deleteMessage(state.activeSession!, lastUser.id);
+      }
+    }
+  }, [undoData]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -749,6 +803,48 @@ export function ChatInput() {
           >
             <Mic2 className="size-4" strokeWidth={2} />
           </ToolbarButton>
+
+          {/* Prompt templates */}
+          <div className="relative">
+            <ToolbarButton
+              aria-label="Prompt templates"
+              tooltip="Prompt templates"
+              active={showTemplates}
+              onClick={() => setShowTemplates(!showTemplates)}
+            >
+              <Sparkles className="size-4" strokeWidth={2} />
+            </ToolbarButton>
+            {showTemplates && (
+              <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-[var(--omega-glass-border)] bg-[var(--omega-bg-2)] p-1.5 shadow-xl z-50">
+                {TEMPLATES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setText(t.prompt);
+                      setShowTemplates(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-[var(--omega-fg-dim)] hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)] transition"
+                  >
+                    <span className="size-5 flex items-center justify-center rounded-md bg-[oklch(0.82_0.17_162_/_0.1)] shrink-0">
+                      <span className="text-[11px]">{t.icon}</span>
+                    </span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Undo */}
+          {undoData && (
+            <span
+              className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)] transition animate-in fade-in slide-in-from-bottom-1"
+              onClick={handleUndo}
+              title="Undo send"
+            >
+              <RotateCcw className="size-3.5" strokeWidth={2} />
+            </span>
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
