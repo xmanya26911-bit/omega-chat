@@ -134,6 +134,7 @@ export function ChatSidebar() {
 
   const driveStatus = useChatStore((s) => s.driveStatus);
   const lastSynced = useChatStore((s) => s.lastSynced);
+  const loadFromDrive = useChatStore((s) => s.loadFromDrive);
 
   const [query, setQuery] = React.useState("");
   const [showPCRemote, setShowPCRemote] = React.useState(true);
