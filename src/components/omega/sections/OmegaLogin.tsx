@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shield, History, Cloud, MonitorSmartphone } from "lucide-react";
+import { Shield, History, Cloud, MonitorSmartphone } from "lucide-react";
 import { useAuthStore } from "../store/auth-store";
 import { useOAuth } from "../hooks/use-oauth";
 import { useEffect, useState } from "react";
@@ -15,34 +15,20 @@ const BADGES = [
 
 /**
  * OmegaLogin — full-screen glass overlay for Google sign-in.
- * z-index: 80 (above the cursor layer at z-60). Animated entrance
- * (fade + scale). Renders only when `loginOverlayOpen` is true in the auth
- * store.
+ * Shows automatically when no user is authenticated. Cannot be dismissed.
+ * z-index: 80 (above the cursor layer at z-60).
  */
 export function OmegaLogin() {
-  const { loginOverlayOpen, beginLogin, closeLoginOverlay } = useOAuth();
+  const user = useAuthStore((s) => s.user);
+  const { loginOverlayOpen, beginLogin } = useOAuth();
   const [redirecting, setRedirecting] = useState(false);
-  
-  // Check if this is mandatory auth (from needAuth=1 redirect)
-  const [isMandatoryAuth, setIsMandatoryAuth] = useState(false);
-  
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const mandatory = params.get("needAuth") === "1";
-      setIsMandatoryAuth(mandatory);
-    }
-  }, []);
 
-  // Close on Escape (only if not mandatory auth)
+  // Auto-open login overlay when there's no authenticated user
   useEffect(() => {
-    if (!loginOverlayOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isMandatoryAuth) closeLoginOverlay();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [loginOverlayOpen, closeLoginOverlay, isMandatoryAuth]);
+    if (!user && !loginOverlayOpen) {
+      useAuthStore.getState().openLoginOverlay();
+    }
+  }, [user, loginOverlayOpen]);
 
   const handleSignIn = async () => {
     setRedirecting(true);
@@ -71,18 +57,6 @@ export function OmegaLogin() {
             WebkitBackdropFilter: "blur(16px) saturate(120%)",
           }}
         >
-          {/* Close button (hidden for mandatory auth) */}
-          {!isMandatoryAuth && (
-            <button
-              onClick={closeLoginOverlay}
-              data-cursor="hover"
-              aria-label="Close login"
-              className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full border border-[var(--omega-glass-border)] text-[var(--omega-fg-dim)] transition-colors hover:border-[var(--omega-emerald)]/50 hover:text-[var(--omega-fg)]"
-            >
-              <X className="h-4.5 w-4.5" />
-            </button>
-          )}
-
           {/* Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.92, y: 24 }}
@@ -136,9 +110,7 @@ export function OmegaLogin() {
                 transition={{ duration: 0.6, delay: 0.32 }}
                 className="mt-2 max-w-xs text-sm leading-relaxed text-[var(--omega-fg-dim)]"
               >
-                {isMandatoryAuth
-                  ? "Sign in with Google to access your chats and memories."
-                  : "Sign in with Google to access your chats and memories."}
+                Sign in with Google to access your chats and memories.
               </motion.p>
 
               {/* Google sign-in button */}
