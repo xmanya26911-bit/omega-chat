@@ -133,6 +133,7 @@ interface ChatState {
   stopGeneration: () => void;
   loadSession: (id: string) => void;
   deleteSession: (id: string) => void;
+  deleteMessage: (sessionId: string, messageId: string) => void;
   renameSession: (id: string, title: string) => void;
   setModel: (model: string) => void;
   setMode: (mode: ChatMode) => void;
@@ -266,6 +267,25 @@ export const useChatStore = create<ChatState>((set, get) => {
         const active =
           s.activeSession === id ? order[0] ?? null : s.activeSession;
         return { sessions, sessionOrder: order, activeSession: active };
+      });
+      persistToLocal(get());
+      triggerSync();
+    },
+
+    deleteMessage: (sessionId, messageId) => {
+      set((s) => {
+        const sess = s.sessions[sessionId];
+        if (!sess) return s;
+        return {
+          sessions: {
+            ...s.sessions,
+            [sessionId]: {
+              ...sess,
+              messages: sess.messages.filter((m) => m.id !== messageId),
+              updatedAt: Date.now(),
+            },
+          },
+        };
       });
       persistToLocal(get());
       triggerSync();

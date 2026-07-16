@@ -4,7 +4,7 @@ import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck } from "lucide-react";
+import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck, Trash2, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ChatMessage } from "../store/chat-store";
 import { useChatStore } from "../store/chat-store";
@@ -241,6 +241,27 @@ function MessageBubbleImpl({
   const [editing, setEditing] = React.useState(false);
   const [editText, setEditText] = React.useState(message.content);
   const [feedback, setFeedback] = React.useState<"positive" | "negative" | null>(null);
+  const [speaking, setSpeaking] = React.useState(false);
+
+  const activeSession = useChatStore((s) => s.activeSession);
+  const deleteMessage = useChatStore((s) => s.deleteMessage);
+
+  const handleSpeak = React.useCallback(() => {
+    if ("speechSynthesis" in window) {
+      if (speaking) {
+        window.speechSynthesis.cancel();
+        setSpeaking(false);
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(message.content);
+      utterance.lang = "en-US";
+      utterance.rate = 1;
+      utterance.onend = () => setSpeaking(false);
+      utterance.onerror = () => setSpeaking(false);
+      setSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [message.content, speaking]);
 
   const handleCopy = React.useCallback(() => {
     navigator.clipboard.writeText(message.content);
@@ -319,6 +340,15 @@ function MessageBubbleImpl({
               aria-label="Edit message"
             >
               <Pencil className="size-4" strokeWidth={2} />
+            </button>
+            <button
+              onClick={() => {
+                if (activeSession) deleteMessage(activeSession, message.id);
+              }}
+              className="size-8 shrink-0 rounded-lg opacity-0 group-hover:opacity-100 transition-all text-[var(--omega-muted)] hover:text-[var(--omega-rose)] hover:bg-[oklch(0.7_0.21_14_/_0.12)]"
+              aria-label="Delete message"
+            >
+              <Trash2 className="size-4" strokeWidth={2} />
             </button>
           </div>
         )}
@@ -420,6 +450,27 @@ function MessageBubbleImpl({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
                   Copy
+                </TooltipContent>
+              </Tooltip>
+
+              {/* TTS — read aloud */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleSpeak}
+                    className={cn(
+                      "inline-flex size-7 items-center justify-center rounded-md transition",
+                      speaking
+                        ? "text-[var(--omega-emerald)] bg-[oklch(0.82_0.17_162_/_0.12)]"
+                        : "text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:bg-[var(--omega-glass-border)]"
+                    )}
+                    aria-label={speaking ? "Stop" : "Read aloud"}
+                  >
+                    <Volume2 className="size-3.5" strokeWidth={2} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="omega-glass border-[var(--omega-glass-border)]">
+                  {speaking ? "Stop" : "Read aloud"}
                 </TooltipContent>
               </Tooltip>
 

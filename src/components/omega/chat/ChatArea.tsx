@@ -98,6 +98,38 @@ export function ChatArea() {
     void sendMessage(text);
   };
 
+  // ── Global keyboard shortcuts ───────────────────────────────
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept when typing in an input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+        e.preventDefault();
+        const store = useChatStore.getState();
+        store.newChat();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        // Focus the sidebar search
+        const searchInput = document.querySelector<HTMLInputElement>(
+          'input[placeholder="Search conversations…"]'
+        );
+        searchInput?.focus();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Delete") {
+        e.preventDefault();
+        const store = useChatStore.getState();
+        if (confirm("Clear all conversations?")) {
+          store.clearAll();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const isEmpty = !session || messages.length === 0;
 
   return (

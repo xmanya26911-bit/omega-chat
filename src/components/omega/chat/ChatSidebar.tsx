@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, Trash2 } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
@@ -153,6 +153,29 @@ export function ChatSidebar() {
     if (!q) return list;
     return list.filter((s) => s.title.toLowerCase().includes(q));
   }, [sessions, sessionOrder, query]);
+
+  // Export current chat as Markdown
+  const handleExport = React.useCallback(() => {
+    const id = activeSession;
+    if (!id || !sessions[id]) return;
+    const sess = sessions[id];
+    let md = `# ${sess.title}\n\n`;
+    md += `*Exported from Omega Cloud • ${new Date(sess.updatedAt).toLocaleString()}*\n\n---\n\n`;
+    for (const m of sess.messages) {
+      if (m.role === "user") {
+        md += `## You\n\n${m.content}\n\n`;
+      } else if (m.role === "assistant") {
+        md += `## Omega\n\n${m.content}\n\n`;
+      }
+    }
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sess.title.replace(/[^a-zA-Z0-9 ]/g, "").trim().slice(0, 40) || "omega-chat"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeSession, sessions]);
 
   const displayName = user?.name || user?.email || "Omega User";
   const displayEmail = user?.email || "";
@@ -352,6 +375,26 @@ export function ChatSidebar() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Export chat ──────────────────────────────────────────── */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={!activeSession || !sessions[activeSession]?.messages?.length}
+          className={cn(
+            "omega-glass-thin flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left",
+            "transition-all duration-200 text-xs font-medium",
+            "hover:bg-[oklch(0.82_0.17_162_/_0.1)] hover:text-[var(--omega-emerald)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+            "text-[var(--omega-fg-dim)]"
+          )}
+        >
+          <Download className="size-4" strokeWidth={2} />
+          Export Chat
+        </button>
       </div>
 
       {/* ── User footer ──────────────────────────────────────────── */}
