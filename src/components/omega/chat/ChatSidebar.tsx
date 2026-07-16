@@ -39,6 +39,8 @@ interface SessionItemProps {
   title: string;
   updatedAt: number;
   active: boolean;
+  query: string;
+  snippet?: string;
   onSelect: () => void;
   onDelete: () => void;
 }
@@ -47,9 +49,40 @@ function SessionItem({
   title,
   updatedAt,
   active,
+  query,
+  snippet,
   onSelect,
   onDelete,
 }: SessionItemProps) {
+
+  // Highlight matching text
+  const highlight = (text: string) => {
+    if (!query.trim()) return text;
+    const q = query.trim().toLowerCase();
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + query.length);
+    const after = text.slice(idx + query.length);
+    let display = `${before}${match}${after}`;
+    const maxLen = 120;
+    if (display.length > maxLen) {
+      const start = Math.max(0, idx - 20);
+      display = (start > 0 ? "…" : "") + text.slice(start, start + maxLen) + (start + maxLen < text.length ? "…" : "");
+    }
+    const newIdx = display.toLowerCase().indexOf(q);
+    if (newIdx === -1) return display;
+    return (
+      <>
+        {display.slice(0, newIdx)}
+        <span className="rounded bg-[oklch(0.82_0.17_162_/_0.25)] text-[var(--omega-emerald)]">
+          {display.slice(newIdx, newIdx + query.length)}
+        </span>
+        {display.slice(newIdx + query.length)}
+      </>
+    );
+  };
+
   return (
     <motion.div
       layout
@@ -94,6 +127,11 @@ function SessionItem({
           <div className="mt-0.5 font-mono text-[10px] text-[var(--omega-muted)]">
             {relativeTime(updatedAt)}
           </div>
+          {snippet && (
+            <div className="mt-1 truncate text-[11px] leading-relaxed text-[var(--omega-muted)]">
+              {highlight(snippet)}
+            </div>
+          )}
         </div>
         <span
           role="button"
@@ -157,7 +195,12 @@ export function ChatSidebar() {
       .map((id) => sessions[id])
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
     if (!q) return list;
-    return list.filter((s) => s.title.toLowerCase().includes(q));
+    return list.filter((s) => {
+      if (s.title.toLowerCase().includes(q)) return true;
+      return s.messages.some((m) =>
+        m.content.toLowerCase().includes(q)
+      );
+    });
   }, [sessions, sessionOrder, query]);
 
   // Export current chat as Markdown
@@ -294,7 +337,7 @@ export function ChatSidebar() {
             value={query}
             data-cursor="hover"
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search chats…"
+            placeholder="Search messages…"
             aria-label="Search conversations"
             className="w-full bg-transparent text-xs text-[var(--omega-fg)] placeholder:text-[var(--omega-muted)] focus:outline-none"
           />
@@ -312,17 +355,35 @@ export function ChatSidebar() {
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {filtered.map((s) => (
-              <SessionItem
-                key={s.id}
-                id={s.id}
-                title={s.title}
-                updatedAt={s.updatedAt}
-                active={s.id === activeSession}
-                onSelect={() => loadSession(s.id)}
-                onDelete={() => deleteSession(s.id)}
-              />
-            ))}
+            {filtered.map((s) => {
+              // Find matching message snippet
+              const q = query.trim().toLowerCase();
+              let snippet: string | undefined;
+              if (q) {
+                const matchMsg = s.messages.find((m) =>
+                  m.content.toLowerCase().includes(q)
+                );
+                if (matchMsg) {
+                  const idx = matchMsg.content.toLowerCase().indexOf(q);
+                  snippet = (idx > 30 ? "…" : "") +
+                    matchMsg.content.slice(Math.max(0, idx - 30), idx + q.length + 50) +
+                    (idx + q.length + 50 < matchMsg.content.length ? "…" : "");
+                }
+              }
+              return (
+                <SessionItem
+                  key={s.id}
+                  id={s.id}
+                  title={s.title}
+                  updatedAt={s.updatedAt}
+                  active={s.id === activeSession}
+                  query={query}
+                  snippet={snippet}
+                  onSelect={() => loadSession(s.id)}
+                  onDelete={() => deleteSession(s.id)}
+                />
+              );
+            })}
           </AnimatePresence>
         )}
       </div>
