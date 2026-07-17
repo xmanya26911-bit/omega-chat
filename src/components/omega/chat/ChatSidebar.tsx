@@ -10,8 +10,10 @@ import { ModelSelect } from "./ModelSelect";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
 import { MemoryManager } from "./MemoryManager";
+import { PluginPanel } from "../plugins/PluginPanel";
 import { useMemoryStore } from "../store/memory-store";
 import { usePrefsStore } from "../store/prefs-store";
+import { usePluginStore } from "../store/plugin-store";
 
 // ── Relative time formatter ───────────────────────────────────────────
 function relativeTime(ts: number): string {
@@ -513,6 +515,9 @@ export function ChatSidebar() {
           </div>
         </div>
       </div>
+
+      {/* ── Plugins ─────────────────────────────────────────────── */}
+      <PluginPanel />
 
       {/* ── Export chat ──────────────────────────────────────────── */}
       <div className="px-3 pb-2">

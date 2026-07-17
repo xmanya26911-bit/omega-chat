@@ -178,6 +178,10 @@ export function useOAuth() {
           history.replaceState(null, "", "/");
           // Init subscription
           useSubscriptionStore.getState().init(data.access_token);
+          // Check for plugin callback
+          if (url.searchParams.get("plugin") && url.searchParams.get("status") === "connected") {
+            usePluginStore.getState().fetchStatus();
+          }
           setReady(true);
           console.log('[useOAuth] OAuth success, ready=true');
         } catch (err) {
@@ -186,6 +190,13 @@ export function useOAuth() {
           if (!cancelled) setReady(true);
         }
         return;
+      }
+
+      // Check for plugin callback (no code flow — already authenticated)
+      if (url.searchParams.get("plugin") && url.searchParams.get("status") === "connected") {
+        usePluginStore.getState().fetchStatus();
+        history.replaceState(null, "", "/");
+        console.log('[useOAuth] Plugin connected, refreshed status');
       }
 
       // 2. No code → try restore from stored user + refresh token

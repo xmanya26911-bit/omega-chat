@@ -13,6 +13,8 @@ const OPENCODE_BASE_URL =
   process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1";
 const FREELMAPI_BASE =
   process.env.FREELMAPI_BASE || "https://omegafreellmapi.vercel.app";
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
+const BLOB_URL = "https://blob.vercel-storage.com";
 
 const OMEGA_SYSTEM_PROMPT = `You are Omega — a professional engineering assistant.
 
@@ -206,8 +208,27 @@ export async function POST(request: NextRequest) {
   };
 
   const userContext = authInfo?.email
-    ? `The signed-in user's email is: ${authInfo.email}. Address them appropriately.${modeAddendum[mode || "standard"] || ""}`
+    ? `The signed-in user's email is: ${authInfo.email}. Address them appropriately.${modeAddendum[mode || "standard"] || ""}${pluginContext}`
     : "The user is not signed in.";
+
+  // ── Plugin context injection ────────────────────────────────────
+  let pluginContext = "";
+  if (authInfo?.sub && BLOB_TOKEN) {
+    try {
+      const ghRes = await fetch(`${BLOB_URL}/users/${authInfo.sub}/plugins/github_token.json`, {
+        headers: { Authorization: `Bearer ${BLOB_TOKEN}` },
+      });
+      if (ghRes.ok) {
+        const ghData = await ghRes.json();
+        pluginContext = `\n[PLUGIN CONTEXT — GitHub is connected as "${ghData.gh_login}". ` +
+          "You can make GitHub API calls by telling the assistant to use the plugin.\n" +
+          "Available plugin actions: list_repos, get_file, search_code, list_issues, get_issue, create_issue, list_prs, get_pr, readme.\n" +
+          "When the user asks about repos, code, issues, PRs, or any GitHub activity, use the plugin to fetch real data.\n" +
+          `Endpoint: POST /api/plugins/github/actions with { action: string, params: { repo: "owner/repo"?, path? , q?, ... } }` +
+          "]";
+      }
+    } catch { /* plugin context not critical */ }
+  }
 
   const openCodeModel = model || "deepseek-v4-flash-free";
   const openCodeKey = process.env.OPENCODE_API_KEY || "";
