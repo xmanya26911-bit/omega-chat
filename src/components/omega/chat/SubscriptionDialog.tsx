@@ -4,6 +4,7 @@ import * as React from "react";
 import { Crown, Sparkles, Check, X } from "lucide-react";
 import { useSubscriptionStore, type Tier } from "../store/subscription-store";
 import { cn } from "@/lib/utils";
+import { PaymentDialog } from "./PaymentDialog";
 
 const PLANS: { id: Tier; name: string; desc: string; limit: string; features: string[]; icon: React.ReactNode }[] = [
   {
@@ -31,6 +32,7 @@ const PLANS: { id: Tier; name: string; desc: string; limit: string; features: st
 
 export function SubscriptionDialog() {
   const { tier, dialogOpen, upgrade, setDialogOpen } = useSubscriptionStore();
+  const [payTier, setPayTier] = React.useState<"pro" | "max" | null>(null);
 
   if (!dialogOpen) return null;
 
@@ -55,7 +57,10 @@ export function SubscriptionDialog() {
             return (
               <button
                 key={plan.id}
-                onClick={() => { if (plan.id !== tier) upgrade(plan.id); }}
+                onClick={() => {
+                if (plan.id === "free" || plan.id === tier) return;
+                setPayTier(plan.id as "pro" | "max");
+              }}
                 className={cn(
                   "group relative flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all duration-300",
                   active
@@ -87,8 +92,17 @@ export function SubscriptionDialog() {
           })}
         </div>
 
-        <p className="mt-4 text-center text-[10px] text-[var(--omega-fg-dim)]">All plans are free — no payment required</p>
+        <p className="mt-4 text-center text-[10px] text-[var(--omega-fg-dim)]">Pro & Max plans require payment verification</p>
       </div>
+
+      {/* Payment dialog for Pro / Max */}
+      {payTier && (
+        <PaymentDialog
+          tier={payTier}
+          open={true}
+          onClose={() => setPayTier(null)}
+        />
+      )}
     </div>
   );
 }
