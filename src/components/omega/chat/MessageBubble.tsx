@@ -13,6 +13,10 @@ import { useChatStore } from "../store/chat-store";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+// ── Remark / Rehype plugins for ReactMarkdown ──────────────────────
+const REMARK_PLUGINS = [remarkMath];
+const REHYPE_PLUGINS = [rehypeKatex];
+
 // ── CopyButton sub-component ──────────────────────────────────────────
 interface CopyButtonProps {
   getText: () => string;
