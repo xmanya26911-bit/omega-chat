@@ -466,7 +466,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: *** ${accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             message: trimmed,
