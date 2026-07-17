@@ -590,7 +590,7 @@ export function ChatSidebar() {
         </div>
       </div>{/* end user footer */}
 
-      {/* Close the full sidebar content wrapper */}
+      </> {/* end sidebar content fragment */}
       )}
 
       {/* Settings dialog — always rendered */}
