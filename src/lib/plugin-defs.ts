@@ -1,22 +1,13 @@
-"use client";
-
-// ── Plugin types and store ──────────────────────────────────────────
+// ── Plugin definitions ─────────────────────────────────────────────
 export type PluginId = "github" | "notion" | "linear" | "jira" | "figma" | "slack" | "gmail" | "calendar" | "vercel" | "stripe";
 
 export interface PluginDef {
   id: PluginId;
   name: string;
-  icon: string; // emoji or icon name
+  icon: string;
   desc: string;
   scopes: string;
   coming_soon?: boolean;
-}
-}
-
-export interface PluginState {
-  tokens: Record<string, string>; // pluginId → encrypted token (or "connected" flag)
-  loading: Record<string, boolean>;
-  error: Record<string, string | null>;
 }
 
 export const PLUGIN_DEFS: PluginDef[] = [
