@@ -9,8 +9,6 @@ import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
 import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 import { SubscriptionDialog } from "@/components/omega/chat/SubscriptionDialog";
-import { PaymentDialog } from "@/components/omega/chat/PaymentDialog";
-import { useSubscriptionStore } from "@/components/omega/store/subscription-store";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +60,6 @@ function ChatShell() {
   const { user } = useAuthStore();
   const { ready } = useOAuth();
   const openLoginOverlay = useAuthStore((s) => s.openLoginOverlay);
-  const { payTier, setPayTier } = useSubscriptionStore();
 
   // If bounced back from landing with ?needAuth=1, open the login overlay.
   React.useEffect(() => {
@@ -122,12 +119,6 @@ function ChatShell() {
       <OmegaLogin />
       {/* ── Subscription dialog ── */}
       <SubscriptionDialog />
-      {/* ── Payment dialog (separate overlay, not nested) ── */}
-      <PaymentDialog
-        tier={payTier || "pro"}
-        open={payTier !== null}
-        onClose={() => setPayTier(null)}
-      />
     </div>
   );
 }
