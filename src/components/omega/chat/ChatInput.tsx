@@ -271,15 +271,20 @@ export function ChatInput() {
   // ── Voice conversation mode (full duplex loop) ────────────────
   const voiceLoopRef = React.useRef(false);
 
+  // Refs to hold start/stop listening callbacks (avoids temporal-dead-zone issues
+  // since startListening/stopListening are defined later in the component)
+  const startListeningRef = React.useRef<(() => void) | null>(null);
+  const stopListeningRef = React.useRef<(() => void) | null>(null);
+
   const startVoiceLoop = React.useCallback(() => {
     voiceLoopRef.current = true;
-    startListening();
-  }, [startListening]);
+    startListeningRef.current?.();
+  }, []);
 
   const stopVoiceLoop = React.useCallback(() => {
     voiceLoopRef.current = false;
-    stopListening?.();
-  }, [stopListening]);
+    stopListeningRef.current?.();
+  }, []);
 
   React.useEffect(() => {
     if (!voiceMode) {
@@ -617,6 +622,10 @@ export function ChatInput() {
     }
     setIsListening(false);
   }, []);
+
+  // Wire up the refs so voice-loop hooks can reach them
+  startListeningRef.current = startListening;
+  stopListeningRef.current = stopListening;
 
   const handleVoiceInput = () => {
     if (isListening) {
