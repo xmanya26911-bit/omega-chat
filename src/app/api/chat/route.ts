@@ -11,6 +11,8 @@ const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID || "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com";
 const OPENCODE_BASE_URL =
   process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1";
+const FREELMAPI_BASE =
+  process.env.FREELMAPI_BASE || "https://omegafreellmapi.vercel.app";
 
 const OMEGA_SYSTEM_PROMPT = `You are Omega — a professional engineering assistant.
 
@@ -200,6 +202,10 @@ export async function POST(request: NextRequest) {
   const openCodeModel = model || "deepseek-v4-flash-free";
   const openCodeKey = process.env.OPENCODE_API_KEY || "";
 
+  // ── Route to FreeLLMAPI proxy or OpenCode ──────────────────────
+  const PROXY_PREFIXES = ["groq/", "google/", "mistral/", "openrouter/", "cerebras/"];
+  const useProxy = PROXY_PREFIXES.some((p) => openCodeModel.startsWith(p));
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -207,6 +213,68 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(sse(obj)));
 
       try {
+        if (useProxy) {
+          // Route through FreeLLMAPI proxy
+          const proxyRes = await fetch(`${FREELMAPI_BASE}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: openCodeModel,
+              messages: [
+                { role: "system", content: OMEGA_SYSTEM_PROMPT },
+                { role: "system", content: "Current date and time: " + new Date().toUTCString() + " (UTC)." },
+                ...(customInstructions ? [{ role: "system" as const, content: customInstructions }] : []),
+                ...(memories ? [{ role: "system" as const, content: memories }] : []),
+                { role: "system", content: userContext },
+                ...(conversationHistory || []).slice(-20),
+                { role: "user", content: sanitized || "[empty message]" },
+              ],
+              stream: true,
+              max_tokens: 2000,
+              ...(typeof temperature === "number" ? { temperature } : {}),
+            }),
+            signal: AbortSignal.timeout(25000),
+          });
+
+          if (!proxyRes.ok) {
+            const errText = await proxyRes.text();
+            send({ type: "error", content: `Proxy error: ${proxyRes.status}` });
+            send({ type: "done" });
+            controller.close();
+            return;
+          }
+
+          // Stream the response back
+          const reader = proxyRes.body?.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const lines = buf.split("\n");
+              buf = lines.pop() || "";
+              for (const line of lines) {
+                const t = line.trim();
+                if (!t.startsWith("data:")) continue;
+                const payload = t.slice(5).trim();
+                if (payload === "[DONE]") continue;
+                try {
+                  const parsed = JSON.parse(payload);
+                  const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || "";
+                  if (delta) send({ type: "delta", content: delta });
+                } catch { /* skip */ }
+              }
+            }
+          }
+          if (buf.trim()) send({ type: "delta", content: buf.trim() });
+          send({ type: "done" });
+          controller.close();
+          return;
+        }
+
+        // ── OpenCode path (default) ──
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
