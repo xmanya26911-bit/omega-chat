@@ -92,7 +92,7 @@ async function fetchUserInfo(accessToken: string): Promise<OmegaUser> {
 /**
  * useOAuth — drives the full Google PKCE auth lifecycle:
  *  - beginLogin(): generate verifier/challenge/state → redirect to Google
- *  - on mount: if `?code=` in URL → exchange, fetch user, clean URL → /chat
+ *  - on mount: if `?code=` in URL → exchange, fetch user, clean URL → /
  *               else try to restore session from stored refresh token
  *  - signOut(): clears everything
  *  - exposes auth state from the auth store
@@ -175,7 +175,7 @@ export function useOAuth() {
           setUser(u);
           sessionStorage.removeItem("omega_state");
           sessionStorage.removeItem("omega_verifier");
-          history.replaceState(null, "", "/chat");
+          history.replaceState(null, "", "/");
           // Init subscription
           useSubscriptionStore.getState().init(data.access_token);
           setReady(true);
