@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useAuthStore, REFRESH_KEY, type OmegaUser } from "../store/auth-store";
 import { useChatStore } from "../store/chat-store";
+import { useSubscriptionStore } from "../store/subscription-store";
 
 const GOOGLE_CLIENT_ID =
   "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com";
@@ -161,6 +162,8 @@ export function useOAuth() {
           sessionStorage.removeItem("omega_state");
           sessionStorage.removeItem("omega_verifier");
           history.replaceState(null, "", "/chat");
+          // Init subscription
+          useSubscriptionStore.getState().init(data.access_token);
           setReady(true);
           console.log('[useOAuth] OAuth success, ready=true');
         } catch (err) {
@@ -181,6 +184,8 @@ export function useOAuth() {
           if (cancelled) return;
           setAccessToken(fresh);
           setUser(JSON.parse(storedUser) as OmegaUser);
+          // Init subscription
+          useSubscriptionStore.getState().init(fresh);
           setReady(true);
           console.log('[useOAuth] Restored from refresh token');
         } catch (err) {

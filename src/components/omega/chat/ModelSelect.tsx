@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "../store/chat-store";
+import { useSubscriptionStore, canAccessModel } from "../store/subscription-store";
 import { cn } from "@/lib/utils";
 
 interface ModelDef {
@@ -133,6 +134,8 @@ export function ModelSelect() {
   const [open, setOpen] = React.useState(false);
   const [proxyModels, setProxyModels] = React.useState<ProxyModel[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const tier = useSubscriptionStore((s) => s.tier);
+  const setDialogOpen = useSubscriptionStore((s) => s.setDialogOpen);
 
   // Fetch proxy model list on mount
   React.useEffect(() => {
@@ -318,38 +321,45 @@ export function ModelSelect() {
             <div className="px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--omega-muted)]">
               {groupName}
             </div>
-            {models.map((m) => (
-              <div
-                key={m.id}
-                className="group/item flex cursor-not-allowed items-center justify-between gap-2 rounded-lg px-2.5 py-2 opacity-40"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="size-3.5 shrink-0 text-[var(--omega-fg-dim)]">🔒</span>
-                  <span className="truncate font-mono text-xs text-[var(--omega-fg-dim)]">
-                    {m.name}
-                  </span>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {m.rate_limit && (
-                    <span
-                      className="shrink-0 rounded px-1 py-px font-mono text-[8px]"
-                      style={{
-                        color: "var(--omega-fg-dim)",
-                        background: "oklch(0.5 0.02 0 / 0.15)",
-                      }}
-                    >
-                      {m.rate_limit}
-                    </span>
+            {models.map((m) => {
+              const allowed = canAccessModel(tier, m.id);
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => { if (!allowed) setDialogOpen(true); }}
+                  className={cn(
+                    "group/item flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 transition-colors",
+                    allowed ? "cursor-pointer hover:bg-[oklch(0.5_0.02_260_/_0.1)]" : "cursor-pointer hover:bg-[oklch(0.82_0.17_82_/_0.06)]"
                   )}
-                  <span
-                    className="shrink-0 rounded px-1 py-px font-mono text-[9px] uppercase text-[var(--omega-amber)]"
-                    style={{ background: "oklch(0.82 0.17 82 / 0.12)" }}
-                  >
-                    Pro
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {allowed ? (
+                      <Radio className="size-3.5 shrink-0 text-[var(--omega-emerald)]" />
+                    ) : (
+                      <span className="size-3.5 shrink-0 text-[var(--omega-amber)]">{tier === "free" ? "🔒" : "🔒"}</span>
+                    )}
+                    <span className={cn(
+                      "truncate font-mono text-xs",
+                      allowed ? "text-[var(--omega-fg)]" : "text-[var(--omega-fg-dim)]"
+                    )}>
+                      {m.name}
+                    </span>
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    {allowed ? (
+                      <span className="rounded px-1 py-px font-mono text-[9px] text-[var(--omega-emerald)]" style={{ background: "oklch(0.82 0.17 162 / 0.12)" }}>✓</span>
+                    ) : (
+                      <span className="rounded px-1.5 py-px font-mono text-[9px] text-[var(--omega-amber)]" style={{ background: "oklch(0.82 0.17 82 / 0.12)" }}>
+                        {tier === "free" ? "Upgrade" : "Upgrade"}
+                      </span>
+                    )}
+                    <span className="shrink-0 rounded px-1 py-px font-mono text-[9px] uppercase text-[var(--omega-amber)]" style={{ background: "oklch(0.82 0.17 82 / 0.12)" }}>
+                      Pro
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </DropdownMenuContent>

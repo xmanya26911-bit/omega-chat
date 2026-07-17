@@ -8,6 +8,7 @@ import { useAuthStore } from "@/components/omega/store/auth-store";
 import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
 import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
+import { SubscriptionDialog } from "@/components/omega/chat/SubscriptionDialog";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,8 @@ function ChatShell() {
 
       {/* ── Login overlay (z-80, above cursor) ── */}
       <OmegaLogin />
+      {/* ── Subscription dialog ── */}
+      <SubscriptionDialog />
     </div>
   );
 }
