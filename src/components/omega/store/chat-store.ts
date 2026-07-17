@@ -54,33 +54,27 @@ async function generateSessionTitle(
   sessionId: string,
   messages: { role: string; content: string }[]
 ) {
-  const preview = messages
-    .filter((m) => m.role !== "error" && m.content.length > 0)
+  const relevant = messages.filter((m) => m.role !== "error" && m.content.length > 0);
+  const preview = relevant
     .slice(0, 3)
     .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.content.slice(0, 200)}`)
     .join("\n");
   if (!preview) return;
   try {
-    const res = await fetch("/api/chat", {
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+    const res = await fetch("/api/title", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: `Generate a short descriptive title (max 6 words, no quotes) for this conversation:\n\n${preview}\n\nTitle:`,
-        model: "deepseek-v4-flash-free",
-        sessionId: "title-gen",
-        searchEnabled: false,
-        mode: "standard",
-        conversationHistory: [],
-      }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ preview }),
     });
     if (!res.ok) return;
-    const data = await res.json().catch(() => ({}));
-    const title = (data.content || data.choices?.[0]?.message?.content || "")
-      .replace(/^["']|["']$/g, "")
-      .trim()
-      .slice(0, 60);
-    if (title && title.length > 3) {
-      useChatStore.getState().renameSession(sessionId, title);
+    const data = await res.json();
+    if (data.title && data.title.length > 3) {
+      useChatStore.getState().renameSession(sessionId, data.title);
     }
   } catch {
     // silent — titles are non-critical
