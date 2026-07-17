@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, Trash2, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, X, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
