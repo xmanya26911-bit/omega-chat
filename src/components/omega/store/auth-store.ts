@@ -54,6 +54,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem("omega_state");
       localStorage.removeItem("omega_verifier");
       setAccessToken(null);
+      // Clear server cookies
+      fetch("/api/auth/set-cookie", { method: "DELETE" }).catch(() => {});
     }
     set({ user: null, accessToken: null, loginOverlayOpen: false });
   },

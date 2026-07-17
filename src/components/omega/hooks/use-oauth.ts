@@ -36,6 +36,18 @@ function generateState(): string {
   return crypto.randomUUID();
 }
 
+async function setServerCookie(accessToken: string, maxAge?: number) {
+  try {
+    await fetch("/api/auth/set-cookie", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken, maxAge }),
+    });
+  } catch {
+    // Non-critical — client fallback cookie still works
+  }
+}
+
 // ── Token helpers ─────────────────────────────────────────────────────
 async function exchangeCode(code: string, codeVerifier: string, redirectUri: string) {
   const res = await fetch("/api/auth", {
@@ -156,6 +168,8 @@ export function useOAuth() {
           if (data.refresh_token) {
             localStorage.setItem(REFRESH_KEY, data.refresh_token);
           }
+          // Set HTTP-only + JS cookies (survives refresh, XSS-proof for API)
+          setServerCookie(data.access_token);
           const u = await fetchUserInfo(data.access_token);
           if (cancelled) return;
           setUser(u);
@@ -183,6 +197,8 @@ export function useOAuth() {
           const fresh = await refreshAccessToken(refreshToken);
           if (cancelled) return;
           setAccessToken(fresh);
+          // Set server cookie to survive refresh
+          setServerCookie(fresh);
           setUser(JSON.parse(storedUser) as OmegaUser);
           // Init subscription
           useSubscriptionStore.getState().init(fresh);
