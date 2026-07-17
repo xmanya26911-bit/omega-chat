@@ -1,8 +1,10 @@
-// Subscription service — stores user tier in Google Drive
-// All tiers are free, this is just a preference/feature flag
+// Subscription service — server-side storage via Vercel Blob
+// User CANNOT forge their subscription — tier is stored server-side
+// keyed by Google's immutable 'sub' (unique user ID)
 "use client";
 
 import { create } from "zustand";
+import { getAccessToken } from "@/lib/access-token";
 
 export type Tier = "free" | "pro" | "max";
 
@@ -13,13 +15,16 @@ interface SubscriptionState {
   loading: boolean;
   dialogOpen: boolean;
   initialized: boolean;
+  error: string | null;
 
   init: (accessToken: string) => Promise<void>;
   upgrade: (tier: Tier) => Promise<boolean>;
+  checkAccess: (modelId: string) => Promise<{ allowed: boolean; reason?: string }>;
   setDialogOpen: (open: boolean) => void;
 }
 
 const TIER_LIMITS: Record<Tier, number> = { free: 100, pro: 500, max: 99999 };
+const API = "/api/subscription";
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   tier: "free",
@@ -28,85 +33,82 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   loading: false,
   dialogOpen: false,
   initialized: false,
+  error: null,
 
   init: async (accessToken) => {
     if (!accessToken) return;
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
-      // Read subscription from Drive
-      const res = await fetch("https://www.googleapis.com/drive/v3/files?q=name='omega_subscription_v1.json'", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const res = await fetch(`${API}?token=${encodeURIComponent(accessToken)}`, {
+        signal: AbortSignal.timeout(10000),
       });
+      if (!res.ok) throw new Error(`Server ${res.status}`);
       const data = await res.json();
-      if (data.files?.length) {
-        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${data.files[0].id}?alt=media`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (fileRes.ok) {
-          const sub = await fileRes.json();
-          const tier = ["free", "pro", "max"].includes(sub.tier) ? sub.tier : "free";
-          set({ tier, dailyLimit: TIER_LIMITS[tier], initialized: true, loading: false });
-          return;
-        }
-      }
-    } catch {}
-    set({ tier: "free", dailyLimit: 100, initialized: true, loading: false });
+      const tier = ["free", "pro", "max"].includes(data.tier) ? data.tier : "free";
+      set({
+        tier,
+        usageToday: data.usageToday || 0,
+        dailyLimit: data.dailyLimit || 100,
+        initialized: true,
+        loading: false,
+      });
+    } catch (err: any) {
+      // On failure, default to free — no privileges leak
+      set({
+        tier: "free",
+        dailyLimit: 100,
+        initialized: true,
+        loading: false,
+        error: err.message || "Failed to load subscription",
+      });
+    }
   },
 
   upgrade: async (tier) => {
-    const accessToken = typeof window !== "undefined" ? (
-      (document.cookie.match(/\bomega_at=([^;]*)/) || [])[1] || null
-    ) : null;
+    const accessToken = getAccessToken();
     if (!accessToken) return false;
 
     try {
-      const sub = { tier, updatedAt: Date.now() };
-      const body = JSON.stringify(sub, null, 2);
-
-      // Find existing subscription file
-      const search = await fetch("https://www.googleapis.com/drive/v3/files?q=name='omega_subscription_v1.json'", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "subscribe", tier }),
+        signal: AbortSignal.timeout(10000),
       });
-      const searchData = await search.json();
-
-      if (searchData.files?.length) {
-        // Update existing
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${searchData.files[0].id}?uploadType=media`, {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body,
-        });
-      } else {
-        // Find omega-cloud folder
-        const folderSearch = await fetch("https://www.googleapis.com/drive/v3/files?q=name='omega-cloud' and mimeType='application/vnd.google-apps.folder'", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const folderData = await folderSearch.json();
-        const folderId = folderData.files?.[0]?.id;
-
-        // Create file
-        const metadata = JSON.stringify({ name: "omega_subscription_v1.json", parents: folderId ? [folderId] : [] });
-        const formData = new FormData();
-        formData.append("metadata", new Blob([metadata], { type: "application/json" }));
-        formData.append("file", new Blob([body], { type: "application/json" }));
-        await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: formData,
-        });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.success) {
+        set({ tier: data.tier, dailyLimit: data.dailyLimit, dialogOpen: false });
+        return true;
       }
-
-      set({ tier, dailyLimit: TIER_LIMITS[tier], dialogOpen: false });
-      return true;
+      return false;
     } catch {
       return false;
+    }
+  },
+
+  checkAccess: async (modelId) => {
+    const accessToken = getAccessToken();
+    if (!accessToken) return { allowed: false, reason: "Not signed in" };
+
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "check-access", model: modelId }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return { allowed: false, reason: "Server error" };
+      return await res.json();
+    } catch {
+      return { allowed: false, reason: "Network error" };
     }
   },
 
   setDialogOpen: (open) => set({ dialogOpen: open }),
 }));
 
-// Helper: check if user can access a model based on tier
+// Client-side helper for instant model gating in the dropdown
 export function canAccessModel(tier: Tier, modelId: string): boolean {
   if (/-free$/.test(modelId) || modelId === "big-pickle") return true;
   if (!/^(groq|google|mistral|openrouter|cerebras)\//.test(modelId)) return tier !== "free";
