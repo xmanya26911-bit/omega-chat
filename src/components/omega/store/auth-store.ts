@@ -49,10 +49,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   closeLoginOverlay: () => set({ loginOverlayOpen: false }),
   signOut: () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem(USER_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-      localStorage.removeItem("omega_state");
-      localStorage.removeItem("omega_verifier");
+      // 🔥 Nuke ALL omega- namespaced localStorage — prevents account
+      //    cross-contamination when another user signs in on same device
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("omega_")) {
+          localStorage.removeItem(key);
+        }
+      }
       setAccessToken(null);
       // Clear server cookies
       fetch("/api/auth/set-cookie", { method: "DELETE" }).catch(() => {});

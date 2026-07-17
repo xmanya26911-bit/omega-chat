@@ -3,8 +3,8 @@
 import { create } from "zustand";
 import { saveToDrive as driveSave, loadFromDrive as driveLoad } from "@/lib/drive-service";
 import { getAccessToken } from "@/lib/access-token";
-import { usePrefsStore } from "../store/prefs-store";
 import { useMemoryStore } from "../store/memory-store";
+import { persistWithUser, loadWithUser } from "@/lib/user-storage";
 
 const STORAGE_KEY = "omega_sessions_v1";
 const DEFAULT_MODEL = "deepseek-v4-flash-free";
@@ -21,14 +21,10 @@ function loadSessions(): {
   sessions: Record<string, ChatSession>;
   order: string[];
 } {
-  if (typeof window === "undefined") return { sessions: {}, order: [] };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = loadWithUser<string>(STORAGE_KEY);
     if (!raw) return { sessions: {}, order: [] };
-    const parsed = JSON.parse(raw) as {
-      sessions: Record<string, ChatSession>;
-      order: string[];
-    };
+    const parsed = JSON.parse(raw);
     return {
       sessions: parsed.sessions || {},
       order: parsed.order || [],
@@ -41,21 +37,19 @@ function loadSessions(): {
 function persistToLocal(state: ChatState) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(
+    persistWithUser(
       STORAGE_KEY,
-      JSON.stringify({
+      {
         sessions: state.sessions,
         order: state.sessionOrder,
         active: state.activeSession,
         model: state.currentModel,
-      })
+      }
     );
   } catch {
     /* quota */
   }
 }
-
-// Generates an AI title from the first few messages
 async function generateSessionTitle(
   sessionId: string,
   messages: { role: string; content: string }[]
@@ -346,7 +340,10 @@ export const useChatStore = create<ChatState>((set, get) => {
     hydrateFromStorage: originalHydrate,
 
     clearAll: () => {
-      if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
+      if (typeof window !== "undefined") {
+        persistWithUser(STORAGE_KEY, { sessions: {}, order: [] });
+        persistWithUser(PREFS_KEY, { customInstructions: "", temperature: 0.7 });
+      }
       set({
         sessions: {},
         sessionOrder: [],

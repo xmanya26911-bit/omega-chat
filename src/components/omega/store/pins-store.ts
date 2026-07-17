@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createUserStorage } from "@/lib/user-storage";
 
 interface PinsState {
   pinnedIds: string[];
@@ -23,6 +24,6 @@ export const usePinsStore = create<PinsState>()(
 
       isPinned: (id) => get().pinnedIds.includes(id),
     }),
-    { name: "omega_pins_v1" }
+    { name: "omega_pins_v1", storage: createUserStorage() }
   )
 );

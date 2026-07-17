@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { saveMemoriesToDrive, loadMemoriesFromDrive } from "@/lib/drive-service";
+import { createUserStorage } from "@/lib/user-storage";
 
 export interface Memory {
   key: string;
@@ -92,6 +93,7 @@ export const useMemoryStore = create<MemoryState>()(
     }),
     {
       name: "omega_memories_v1",
+      storage: createUserStorage(),
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrate();
       },

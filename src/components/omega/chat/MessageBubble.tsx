@@ -195,9 +195,20 @@ function StreamingDots() {
   );
 }
 
+// ── LaTeX delimiter normaliser ────────────────────────────────────────
+// ── LaTeX delimiter normalizer ────────────────────────────────────────
+// AI models output \(...\) and \[...\] but remark-math only parses $...$ and $$...$$
+function normalizeMathDelimiters(text: string): string {
+  return text
+    // \[ ... \] → $$ ... $$
+    .replace(/\\\[/g, "$$$$")
+    .replace(/\\\]/g, "$$$$")
+    // \( ... \) → $ ... $
+    .replace(/\\\(/g, "$")
+    .replace(/\\\)/g, "$");
+}
+
 // ── MD_COMPONENTS + plugins ──────────────────────────────────────────
-const REMARK_PLUGINS = [remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
 
 const MD_COMPONENTS = {
   pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
@@ -482,7 +493,7 @@ function MessageBubbleImpl({
                 rehypePlugins={REHYPE_PLUGINS}
                 components={MD_COMPONENTS as never}
               >
-                {message.content}
+                {normalizeMathDelimiters(message.content)}
               </ReactMarkdown>
             </div>
           )}

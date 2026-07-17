@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createUserStorage } from "@/lib/user-storage";
 
 export interface ChatFolder {
   id: string;
@@ -73,6 +74,6 @@ export const useFoldersStore = create<FoldersState>()(
 
       getFolderName: (id) => get().folders[id]?.name || "",
     }),
-    { name: "omega_folders_v1" }
+    { name: "omega_folders_v1", storage: createUserStorage() }
   )
 );
