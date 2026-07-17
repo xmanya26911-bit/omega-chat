@@ -4,6 +4,8 @@
 const BLOB_API = "https://api.vercel.com/v1/blob/stores/store_McMfozoKKfiKsUcU/blobs";
 const CORS = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
 
+export const runtime = "nodejs";
+
 function getHeaders() {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) return null;
@@ -40,6 +42,8 @@ async function writeUser(sub, data) {
 
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
+  console.log("[subscription] method:", req.method, "url:", req.url);
 
   // Auth check
   const auth = req.headers.get("Authorization");
