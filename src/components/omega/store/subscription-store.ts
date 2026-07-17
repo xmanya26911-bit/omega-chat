@@ -16,11 +16,13 @@ interface SubscriptionState {
   dialogOpen: boolean;
   initialized: boolean;
   error: string | null;
+  payTier: "pro" | "max" | null; // Added: which tier user wants to pay for
 
   init: (accessToken: string) => Promise<void>;
   upgrade: (tier: Tier) => Promise<boolean>;
   checkAccess: (modelId: string) => Promise<{ allowed: boolean; reason?: string }>;
   setDialogOpen: (open: boolean) => void;
+  setPayTier: (tier: "pro" | "max" | null) => void;
 }
 
 const TIER_LIMITS: Record<Tier, number> = { free: 100, pro: 500, max: 99999 };
@@ -35,6 +37,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   initialized: false,
   error: null,
 
+  payTier: null,
   init: async (accessToken) => {
     if (!accessToken) return;
     set({ loading: true, error: null });
@@ -106,6 +109,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   setDialogOpen: (open) => set({ dialogOpen: open }),
+  setPayTier: (tier) => set({ payTier: tier }),
 }));
 
 // Client-side helper for instant model gating in the dropdown
