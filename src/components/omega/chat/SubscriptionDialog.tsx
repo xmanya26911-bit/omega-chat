@@ -161,8 +161,13 @@ export function SubscriptionDialog() {
                   <button type="button" key={plan.id}
                     onClick={() => {
                       if (plan.id === "free" || plan.id === tier) return;
+                      // Open UPI in new tab directly — simplest possible flow
+                      const p = plan.id === "pro" ? "849" : "1699";
+                      const upi = `upi://pay?pa=9974526911@pt&pn=Omega%20Cloud&am=${p}&cu=INR`;
+                      window.open(upi, "_blank");
+                      // Show the UPI ID + UTR form inline
                       setPayTier(plan.id as "pro" | "max");
-                      setStep("show");
+                      setStep("verify");
                     }}
                     className={cn(
                       "group relative flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all duration-300",
