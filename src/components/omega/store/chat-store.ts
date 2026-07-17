@@ -110,7 +110,7 @@ export interface ChatSession {
   pinned?: boolean;
 }
 
-export type ChatMode = "standard" | "research" | "coding" | "canvas" | "python";
+export type ChatMode = "standard" | "research" | "coding";
 
 interface ChatState {
   sessions: Record<string, ChatSession>;

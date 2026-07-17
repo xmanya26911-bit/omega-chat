@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Code2, MessageSquare, PenTool, Search, Terminal } from "lucide-react";
+import { Code2, MessageSquare, Search } from "lucide-react";
 import { useChatStore, type ChatMode } from "../store/chat-store";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +16,6 @@ const MODES: ModeDef[] = [
   { id: "standard", label: "Standard", icon: MessageSquare },
   { id: "research", label: "Deep Research", icon: Search },
   { id: "coding", label: "Coding", icon: Code2 },
-  { id: "canvas", label: "Canvas", icon: PenTool },
-  { id: "python", label: "Python", icon: Terminal },
 ];
 
 /**

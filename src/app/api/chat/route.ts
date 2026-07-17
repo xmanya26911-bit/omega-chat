@@ -183,16 +183,26 @@ export async function POST(request: NextRequest) {
   // distinguish user intent from injected instructions.
   const sanitized = `[User Message Start]\n${message}\n[User Message End]`;
 
-  // Mode-specific addendum
+  // Mode-specific addendum — deep, actionable instructions per mode
   const modeAddendum: Record<string, string> = {
     research:
-      " The user is in Deep Research mode. Be thorough, cite reasoning, and structure your answer with clear sections.",
+      " You are in Deep Research mode. This is NOT a simple Q&A. " +
+      "1. First, analyze what information is needed and plan your research approach. " +
+      "2. Break the topic into sub-questions and address each systematically. " +
+      "3. Provide thorough, structured answers with clear sections, reasoning chains, and evidence. " +
+      "4. Use bullet points, tables, code examples, and comparisons where helpful. " +
+      "5. If the question is complex, start with a brief overview, then dive deep. " +
+      "6. Always cite your reasoning — show your work. " +
+      "7. End with a concise summary of key takeaways.",
     coding:
-      " The user is in Coding mode. Focus on production-quality code. Always use fenced code blocks with language tags. Explain briefly after the code.",
-    canvas:
-      " The user is in Canvas mode. Produce well-structured, creative, long-form content.",
-    python:
-      " The user is in Python mode. Provide Python-first solutions with runnable code blocks.",
+      " You are in Coding mode. Your primary output is production-quality code. " +
+      "1. Always output code in fenced code blocks with the correct language tag (```typescript, ```python, ```bash, etc.). " +
+      "2. Write clean, well-commented, production-grade code with error handling. " +
+      "3. After the code block, provide a brief explanation (1-2 lines) of how it works. " +
+      "4. If the user describes a problem, first propose your approach, then write the code. " +
+      "5. Include import statements, type definitions, and complete runnable examples. " +
+      "6. For bug fixes, explain the root cause, then show the fix. " +
+      "7. Prefer modern, idiomatic patterns for the language being used.",
   };
 
   const userContext = authInfo?.email

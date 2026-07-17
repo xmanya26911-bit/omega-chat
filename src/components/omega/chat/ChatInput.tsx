@@ -803,16 +803,6 @@ export function ChatInput() {
             )}
           </ToolbarButton>
 
-          {/* Voice conversation mode toggle */}
-          <ToolbarButton
-            aria-label="Toggle voice conversation mode"
-            tooltip={voiceMode ? "Voice conversation ON — speak, AI responds aloud" : "Voice conversation — speak & hear replies"}
-            active={voiceMode}
-            onClick={() => setVoiceMode(!voiceMode)}
-          >
-            <Mic2 className="size-4" strokeWidth={2} />
-          </ToolbarButton>
-
           {/* Prompt templates */}
           <div className="relative">
             <ToolbarButton
