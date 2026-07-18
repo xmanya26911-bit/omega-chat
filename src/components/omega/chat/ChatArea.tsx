@@ -307,7 +307,7 @@ function EmptyState({ onSuggestion, disabled }: EmptyStateProps) {
         initial={{ opacity: 0, scale: 0.85, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
-        className="mb-6 flex size-20 items-center justify-center rounded-full font-display text-4xl font-semibold omega-text-aurora"
+        className="mb-6 flex size-16 items-center justify-center rounded-full font-display text-3xl font-semibold omega-text-aurora sm:size-20 sm:text-4xl"
         style={{
           background:
             "radial-gradient(circle at 50% 50%, oklch(0.82 0.17 162 / 0.18), transparent 70%)",
@@ -322,7 +322,7 @@ function EmptyState({ onSuggestion, disabled }: EmptyStateProps) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="font-display text-2xl font-semibold tracking-tight text-[var(--omega-fg)] sm:text-3xl"
+        className="font-display text-2xl font-semibold tracking-tight text-[var(--omega-fg)] text-center sm:text-3xl"
       >
         How can I help you today?
       </motion.h2>

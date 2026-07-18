@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, X, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, X, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List, MessageSquare } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
 import { MemoryManager } from "./MemoryManager";
 import { PluginPanel } from "../plugins/PluginPanel";
+import { ChatGPTImport } from "./ChatGPTImport";
 import { useMemoryStore } from "../store/memory-store";
 import { usePrefsStore } from "../store/prefs-store";
 import { usePluginStore } from "../store/plugin-store";
@@ -199,6 +200,7 @@ export function ChatSidebar() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMemory, setShowMemory] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [showImport, setShowImport] = React.useState(false);
 
   const hydratePrefs = usePrefsStore((s) => s.hydrate);
   const syncFromDrive = useMemoryStore((s) => s.syncFromDrive);
@@ -519,6 +521,24 @@ export function ChatSidebar() {
       {/* ── Plugins ─────────────────────────────────────────────── */}
       <PluginPanel />
 
+      {/* ── Import from ChatGPT ────────────────────────────────── */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={() => setShowImport(true)}
+          className={cn(
+            "omega-glass-thin flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left",
+            "transition-all duration-200 text-xs font-medium",
+            "hover:bg-[oklch(0.82_0.17_162_/_0.1)] hover:text-[var(--omega-emerald)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
+            "text-[var(--omega-fg-dim)]"
+          )}
+        >
+          <MessageSquare className="size-4" strokeWidth={2} />
+          Import from ChatGPT
+        </button>
+      </div>
+
       {/* ── Export chat ──────────────────────────────────────────── */}
       <div className="px-3 pb-2">
         <button
@@ -600,6 +620,9 @@ export function ChatSidebar() {
 
       {/* Settings dialog — always rendered */}
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* ChatGPT Import dialog */}
+      <ChatGPTImport open={showImport} onClose={() => setShowImport(false)} />
 
       {/* Memory panel overlay */}
       {showMemory && (

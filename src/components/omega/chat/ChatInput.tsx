@@ -107,16 +107,16 @@ function ToolbarButton({
   className,
 }: ToolbarButtonProps) {
   const btn = (
-    <button
-      type="button"
-      data-cursor="hover"
-      aria-label={ariaLabel}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "inline-flex size-9 items-center justify-center rounded-lg transition-all duration-200",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
+  <button
+  type="button"
+  data-cursor="hover"
+  aria-label={ariaLabel}
+  aria-pressed={active}
+  disabled={disabled}
+  onClick={onClick}
+  className={cn(
+  "inline-flex size-9 items-center justify-center rounded-lg transition-all duration-200 sm:size-9 size-8",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
         disabled
           ? "cursor-not-allowed text-[var(--omega-muted)] opacity-50"
           : active
@@ -681,7 +681,7 @@ export function ChatInput() {
 
       <div
         className={cn(
-          "omega-glass rounded-2xl p-2.5",
+          "omega-glass rounded-2xl p-2 sm:p-2.5",
           "transition-all duration-300",
           "focus-within:border-[oklch(0.82_0.17_162_/_0.4)]",
           isListening && "ring-2 ring-[oklch(0.7_0.21_14_/_0.5)]"
@@ -891,7 +891,7 @@ export function ChatInput() {
       </div>
 
       {/* helper hint */}
-      <div className="mt-1.5 px-1 text-center font-mono text-[10px] text-[var(--omega-muted)]">
+      <div className="mt-1.5 px-1 text-center font-mono text-[10px] text-[var(--omega-muted)] hidden sm:block">
         <kbd className="font-mono">Enter</kbd> to send ·{" "}
         <kbd className="font-mono">Shift+Enter</kbd> for newline ·{" "}
         drag & drop files

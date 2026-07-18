@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { Suspense } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { PanelRightOpen, X } from "lucide-react";
 import { useOAuth } from "@/components/omega/hooks/use-oauth";
 import { useAuthStore } from "@/components/omega/store/auth-store";
 import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
 import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 import { SubscriptionDialog } from "@/components/omega/chat/SubscriptionDialog";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,7 @@ function ChatShell() {
   const { user } = useAuthStore();
   const { ready } = useOAuth();
   const openLoginOverlay = useAuthStore((s) => s.openLoginOverlay);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   // If bounced back from landing with ?needAuth=1, open the login overlay.
   React.useEffect(() => {
@@ -107,10 +110,61 @@ function ChatShell() {
         />
       </div>
 
+      {/* ── Mobile hamburger ─────────────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        className={cn(
+          "fixed left-3 top-3 z-30 inline-flex size-9 items-center justify-center rounded-xl md:hidden",
+          "omega-glass text-[var(--omega-fg-dim)]",
+          "hover:text-[var(--omega-emerald)] active:scale-95",
+          "transition-all"
+        )}
+        aria-label="Open sidebar"
+      >
+        <PanelRightOpen className="size-4" strokeWidth={2} />
+      </button>
+
       {/* ── Two-column chat layout ───────────────────────────────────── */}
       <div className="relative z-10 flex h-full w-full">
-        <ChatSidebar />
-        <main className="flex min-w-0 flex-1 flex-col">
+        {/* Desktop sidebar (always inline) */}
+        <div className="hidden md:flex">
+          <ChatSidebar />
+        </div>
+
+        {/* Mobile sidebar overlay */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <motion.aside
+                initial={{ x: -300 }}
+                animate={{ x: 0 }}
+                exit={{ x: -300 }}
+                transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                className="fixed left-0 top-0 z-50 h-full w-[280px] md:hidden"
+              >
+                <ChatSidebar />
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="absolute right-3 top-3 z-10 inline-flex size-7 items-center justify-center rounded-lg text-[var(--omega-muted)] hover:text-[var(--omega-fg)]"
+                  aria-label="Close sidebar"
+                >
+                  <X className="size-4" />
+                </button>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
+        <main className="flex min-w-0 flex-1 flex-col md:ml-0">
           <ChatArea />
         </main>
       </div>
