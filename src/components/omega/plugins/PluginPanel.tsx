@@ -76,7 +76,7 @@ export function PluginPanel({ collapsed }: { collapsed?: boolean }) {
             className="overflow-hidden"
           >
             <div className="mt-1 space-y-1">
-              {PLUGIN_DEFS.map((def) => {
+              {PLUGIN_DEFS.filter(d => d.id === "github" || d.id === "vercel").map((def) => {
                 const conn = plugins[def.id];
                 const isConnected = conn?.connected ?? false;
                 const isLoading = checking[def.id] ?? false;

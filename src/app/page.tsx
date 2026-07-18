@@ -203,28 +203,29 @@ function ChatShell() {
 
         <main id="main-content" className="flex min-w-0 flex-1 flex-col md:ml-0">
           <ChatArea />
-          {/* ── Floating panel buttons ──────────────────────────── */}
-          <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setShowREPL(true)}
-              className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
-              aria-label="Toggle Python REPL"
-              title="Python REPL (Ctrl+Shift+I)"
-            >
-              <Terminal className="size-4.5" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowShortcuts(true)}
-              className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
-              aria-label="Keyboard shortcuts"
-              title="Keyboard shortcuts (?)"
-            >
-              <Keyboard className="size-4.5" strokeWidth={2} />
-            </button>
-          </div>
         </main>
+      </div>
+
+      {/* ── Floating panel buttons (above login overlay) ──────────── */}
+      <div className="fixed bottom-24 right-4 z-[90] flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => setShowREPL(true)}
+          className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
+          aria-label="Toggle Python REPL"
+          title="Python REPL (Ctrl+Shift+I)"
+        >
+          <Terminal className="size-4.5" strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowShortcuts(true)}
+          className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="size-4.5" strokeWidth={2} />
+        </button>
       </div>
 
       {/* ── Login overlay (z-80, above cursor) ── */}

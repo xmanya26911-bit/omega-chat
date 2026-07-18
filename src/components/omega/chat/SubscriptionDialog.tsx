@@ -6,13 +6,13 @@ import { useSubscriptionStore, type Tier } from "../store/subscription-store";
 import { cn } from "@/lib/utils";
 
 const PLANS: { id: Tier; name: string; desc: string; limit: string; features: string[]; icon: React.ReactNode }[] = [
-  { id: "pro", name: "Pro", desc: "5 AI models + higher limits", limit: "100 msgs / 5 hrs",
-    features: ["All Free models", "100 messages per 5 hours", "Faster response priority"],
+  { id: "pro", name: "Pro", desc: "5 AI models + higher limits", limit: "5hr rate limit",
+    features: ["All Free models", "Faster response priority", "Priority support"],
     icon: <Crown className="size-5" /> },
   { id: "max", name: "Max", desc: "Everything unlimited", limit: "Unlimited",
-    features: ["All models", "Unlimited messages", "No rate limiting", "Priority support"],
+    features: ["All models", "No rate limit", "Priority support", "Early access"],
     icon: <Sparkles className="size-5" /> },
-  { id: "free", name: "Free", desc: "5 AI models", limit: "30 msgs / 3 hrs",
+  { id: "free", name: "Free", desc: "5 AI models", limit: "3hr rate limit",
     features: ["DeepSeek V4 Flash", "MiMo-V2.5", "Nemotron 3 Ultra", "North Mini Code", "Big Pickle"],
     icon: <Check className="size-5" /> },
 ];
