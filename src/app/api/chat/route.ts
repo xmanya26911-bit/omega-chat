@@ -1,7 +1,10 @@
 // Omega Cloud — Chat streaming endpoint (SSE)
 // Verifies the Google OAuth access token, then streams an AI completion
 // via the OpenCode Zen API (OpenAI-compatible).
-// Format: data: {"type":"delta","content":"..."} / {"type":"done"} / {"type":"error","content":"..."}
+// Format: data: {\"type\":\"delta\",\"content\":\"...\"} / {\"type\":\"done\"} / {\"type\":\"error\",\"content\":\"...\"}
+//
+// Rate limiting is time-window based and enforced inline (no double HTTP call
+// to /api/subscription). See /api/subscription/route.ts for the shared logic.
 
 import { NextRequest } from "next/server";
 
@@ -11,10 +14,19 @@ const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID || "855819039877-5f4a8biid8hkf8j2hhd1jk3bj9ng2f5f.apps.googleusercontent.com";
 const OPENCODE_BASE_URL =
   process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1";
-const FREELMAPI_BASE =
-  process.env.FREELMAPI_BASE || "https://omegafreellmapi.vercel.app";
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
-const BLOB_URL = "https://blob.vercel-storage.com";
+
+// ── Tier config (mirrors /api/subscription/route.ts) ─────────────────
+const TIERS = {
+  free: { windowMs: 3 * 60 * 60 * 1000, maxMessages: 30 },
+  pro: { windowMs: 5 * 60 * 60 * 1000, maxMessages: 100 },
+  max: { windowMs: 0, maxMessages: 0 }, // 0 = unlimited
+} as const;
+
+function getTierConfig(tier: string) {
+  if (tier === "pro" || tier === "max") return TIERS[tier];
+  return TIERS.free;
+}
 
 const OMEGA_SYSTEM_PROMPT = `You are Omega — a professional engineering assistant.
 
@@ -80,7 +92,7 @@ async function verifyToken(authHeader: string | null) {
   }
 }
 
-// ── Rate limiting ────────────────────────────────────────────────────
+// ── IP rate limiting (coarse, in-memory) ─────────────────────────────
 const rateMap = new Map<string, number[]>();
 function checkRate(key: string, maxReqs = 30, windowMs = 60000) {
   const now = Date.now();
@@ -88,6 +100,104 @@ function checkRate(key: string, maxReqs = 30, windowMs = 60000) {
   times.push(now);
   rateMap.set(key, times);
   return times.length <= maxReqs;
+}
+
+// ── Blob helpers (raw fetch, no @vercel/blob SDK) ────────────────────
+function blobStoreId(): string | null {
+  if (!BLOB_TOKEN) return null;
+  const storeId = BLOB_TOKEN.split("_").slice(3, 4)[0];
+  return storeId || null;
+}
+
+async function blobGet(key: string): Promise<any | null> {
+  const storeId = blobStoreId();
+  if (!storeId) return null;
+  const url = `https://api.vercel.com/v1/blob/stores/${storeId}/blobs/${key}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${BLOB_TOKEN}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function blobPut(key: string, data: any): Promise<boolean> {
+  const storeId = blobStoreId();
+  if (!storeId) return false;
+  const url = `https://api.vercel.com/v1/blob/stores/${storeId}/blobs/${key}?access=private`;
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${BLOB_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(8000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Inline time-window rate limit check ──────────────────────────────
+// Verifies tier via Blob, checks the rolling time-window limit, and
+// increments usage (pushes the current timestamp) if allowed.
+// Returns { allowed, reason? } — reason is a human-readable 429 message.
+async function checkUserRateLimit(
+  sub: string
+): Promise<{ allowed: boolean; reason?: string }> {
+  const now = Date.now();
+  let existing: any | null = null;
+  try {
+    existing = await blobGet(`users/${sub}.json`);
+  } catch {
+    existing = null;
+  }
+
+  const tier: string =
+    existing && (existing.tier === "pro" || existing.tier === "max" || existing.tier === "free")
+      ? (existing.tier as string)
+      : "free";
+  const cfg = getTierConfig(tier);
+
+  // max tier — unlimited, no tracking
+  if (tier === "max" || cfg.maxMessages === 0 || cfg.windowMs === 0) {
+    return { allowed: true };
+  }
+
+  const rawTs: number[] = Array.isArray(existing?.messageTimestamps)
+    ? (existing.messageTimestamps as number[])
+    : [];
+  const inWindow = rawTs.filter((t) => typeof t === "number" && now - t < cfg.windowMs);
+
+  if (inWindow.length >= cfg.maxMessages) {
+    const oldest = inWindow.length > 0 ? Math.min(...inWindow) : now;
+    const resetsInMs = oldest + cfg.windowMs - now;
+    const resetsInMinutes = Math.max(1, Math.ceil(resetsInMs / 60000));
+    return {
+      allowed: false,
+      reason: `Rate limit: You've used ${inWindow.length} of ${cfg.maxMessages} messages. Your window resets in ${resetsInMinutes} minutes.`,
+    };
+  }
+
+  // Allowed — push current timestamp and save
+  inWindow.push(now);
+  const capped = inWindow.slice(-Math.max(cfg.maxMessages * 2, 50));
+  const updated = {
+    ...(existing && typeof existing === "object" ? existing : {}),
+    tier,
+    messageTimestamps: capped,
+  };
+  try {
+    await blobPut(`users/${sub}.json`, updated);
+  } catch {
+    // Non-fatal — allow the request through even if persist failed
+  }
+
+  return { allowed: true };
 }
 
 function sse(data: unknown) {
@@ -116,12 +226,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Per-user rate limit
-  if (authInfo.sub && !checkRate("user:" + authInfo.sub, 100, 60000)) {
-    return new Response(
-      JSON.stringify({ error: "Rate limit exceeded for this user" }),
-      { status: 429, headers: { "Content-Type": "application/json" } }
-    );
+  // ── Per-user time-window rate limit (inline, via Blob) ──────────
+  if (authInfo.sub) {
+    const rl = await checkUserRateLimit(authInfo.sub);
+    if (!rl.allowed) {
+      return new Response(
+        JSON.stringify({ error: rl.reason || "Rate limit exceeded" }),
+        { status: 429, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 
   let body: {
@@ -207,15 +320,11 @@ export async function POST(request: NextRequest) {
       "7. Prefer modern, idiomatic patterns for the language being used.",
   };
 
-  const userContext = authInfo?.email
-    ? `The signed-in user's email is: ${authInfo.email}. Address them appropriately.${modeAddendum[mode || "standard"] || ""}${pluginContext}`
-    : "The user is not signed in.";
-
   // ── Plugin context injection ────────────────────────────────────
   let pluginContext = "";
   if (authInfo?.sub && BLOB_TOKEN) {
     try {
-      const ghRes = await fetch(`${BLOB_URL}/users/${authInfo.sub}/plugins/github_token.json`, {
+      const ghRes = await fetch(`https://api.vercel.com/v1/blob/stores/${blobStoreId()}/blobs/users/${authInfo.sub}/plugins/github_token.json`, {
         headers: { Authorization: `Bearer ${BLOB_TOKEN}` },
       });
       if (ghRes.ok) {
@@ -230,12 +339,12 @@ export async function POST(request: NextRequest) {
     } catch { /* plugin context not critical */ }
   }
 
+  const userContext = authInfo?.email
+    ? `The signed-in user's email is: ${authInfo.email}. Address them appropriately.${modeAddendum[mode || "standard"] || ""}${pluginContext}`
+    : "The user is not signed in.";
+
   const openCodeModel = model || "deepseek-v4-flash-free";
   const openCodeKey = process.env.OPENCODE_API_KEY || "";
-
-  // ── Route to FreeLLMAPI proxy or OpenCode ──────────────────────
-  const PROXY_PREFIXES = ["groq/", "google/", "mistral/", "openrouter/", "cerebras/"];
-  const useProxy = PROXY_PREFIXES.some((p) => openCodeModel.startsWith(p));
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -244,68 +353,7 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(sse(obj)));
 
       try {
-        if (useProxy) {
-          // Route through FreeLLMAPI proxy
-          const proxyRes = await fetch(`${FREELMAPI_BASE}/v1/chat/completions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: openCodeModel,
-              messages: [
-                { role: "system", content: OMEGA_SYSTEM_PROMPT },
-                { role: "system", content: "Current date and time: " + new Date().toUTCString() + " (UTC)." },
-                ...(customInstructions ? [{ role: "system" as const, content: customInstructions }] : []),
-                ...(memories ? [{ role: "system" as const, content: memories }] : []),
-                { role: "system", content: userContext },
-                ...(conversationHistory || []).slice(-20),
-                { role: "user", content: sanitized || "[empty message]" },
-              ],
-              stream: true,
-              max_tokens: 2000,
-              ...(typeof temperature === "number" ? { temperature } : {}),
-            }),
-            signal: AbortSignal.timeout(25000),
-          });
-
-          if (!proxyRes.ok) {
-            const errText = await proxyRes.text();
-            send({ type: "error", content: `Proxy error: ${proxyRes.status}` });
-            send({ type: "done" });
-            controller.close();
-            return;
-          }
-
-          // Stream the response back
-          const reader = proxyRes.body?.getReader();
-          const decoder = new TextDecoder();
-          let buf = "";
-          if (reader) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buf += decoder.decode(value, { stream: true });
-              const lines = buf.split("\n");
-              buf = lines.pop() || "";
-              for (const line of lines) {
-                const t = line.trim();
-                if (!t.startsWith("data:")) continue;
-                const payload = t.slice(5).trim();
-                if (payload === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(payload);
-                  const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || "";
-                  if (delta) send({ type: "delta", content: delta });
-                } catch { /* skip */ }
-              }
-            }
-          }
-          if (buf.trim()) send({ type: "delta", content: buf.trim() });
-          send({ type: "done" });
-          controller.close();
-          return;
-        }
-
-        // ── OpenCode path (default) ──
+        // ── OpenCode path (only path) ──
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };

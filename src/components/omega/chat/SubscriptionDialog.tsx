@@ -6,14 +6,14 @@ import { useSubscriptionStore, type Tier } from "../store/subscription-store";
 import { cn } from "@/lib/utils";
 
 const PLANS: { id: Tier; name: string; desc: string; limit: string; features: string[]; icon: React.ReactNode }[] = [
-  { id: "pro", name: "Pro", desc: "Unlock all proxy models", limit: "500 msg/day",
-    features: ["All Free models", "Groq (Llama, Qwen)", "Google (Gemini, Gemma)", "Mistral (Large, Codestral)", "OpenRouter (DeepSeek, Kimi)"],
+  { id: "pro", name: "Pro", desc: "5 AI models + higher limits", limit: "100 msgs / 5 hrs",
+    features: ["All Free models", "100 messages per 5 hours", "Faster response priority"],
     icon: <Crown className="size-5" /> },
   { id: "max", name: "Max", desc: "Everything unlimited", limit: "Unlimited",
-    features: ["All Pro models", "Unlimited usage", "Priority routing", "Early access"],
+    features: ["All models", "Unlimited messages", "No rate limiting", "Priority support"],
     icon: <Sparkles className="size-5" /> },
-  { id: "free", name: "Free", desc: "5 OpenCode models", limit: "100 msg/day",
-    features: ["DeepSeek V4 Flash Free", "MiMo-V2.5 Free", "Nemotron 3 Ultra Free", "North Mini Code Free", "Big Pickle (Free)"],
+  { id: "free", name: "Free", desc: "5 AI models", limit: "30 msgs / 3 hrs",
+    features: ["DeepSeek V4 Flash", "MiMo-V2.5", "Nemotron 3 Ultra", "North Mini Code", "Big Pickle"],
     icon: <Check className="size-5" /> },
 ];
 

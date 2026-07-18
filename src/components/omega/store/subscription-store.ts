@@ -1,6 +1,9 @@
 // Subscription service — server-side storage via Vercel Blob
 // User CANNOT forge their subscription — tier is stored server-side
 // keyed by Google's immutable 'sub' (unique user ID)
+//
+// All 5 models are available to all tiers. The only gating is the
+// time-window rate limit (free: 30/3h, pro: 100/5h, max: unlimited).
 "use client";
 
 import { create } from "zustand";
@@ -8,10 +11,31 @@ import { getAccessToken } from "@/lib/access-token";
 
 export type Tier = "free" | "pro" | "max";
 
+export interface TIER_WINDOWS_TYPE {
+  maxMessages: number;
+  windowMs: number;
+  windowHours: number;
+}
+
+export const TIER_WINDOWS: Record<Tier, TIER_WINDOWS_TYPE> = {
+  free: { maxMessages: 30, windowMs: 3 * 60 * 60 * 1000, windowHours: 3 },
+  pro: { maxMessages: 100, windowMs: 5 * 60 * 60 * 1000, windowHours: 5 },
+  max: { maxMessages: 0, windowMs: 0, windowHours: 0 },
+};
+
+export interface CheckAccessResult {
+  allowed: boolean;
+  reason?: string;
+  messagesUsed?: number;
+  messagesLimit?: number;
+  resetsInMinutes?: number;
+}
+
 interface SubscriptionState {
   tier: Tier;
-  usageToday: number;
-  dailyLimit: number;
+  messagesUsed: number;
+  messagesLimit: number;
+  windowHours: number;
   loading: boolean;
   dialogOpen: boolean;
   initialized: boolean;
@@ -19,17 +43,17 @@ interface SubscriptionState {
 
   init: (accessToken: string) => Promise<void>;
   upgrade: (tier: Tier) => Promise<boolean>;
-  checkAccess: (modelId: string) => Promise<{ allowed: boolean; reason?: string }>;
+  checkAccess: (modelId?: string) => Promise<CheckAccessResult>;
   setDialogOpen: (open: boolean) => void;
 }
 
-const TIER_LIMITS: Record<Tier, number> = { free: 100, pro: 500, max: 99999 };
 const API = "/api/subscription";
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   tier: "free",
-  usageToday: 0,
-  dailyLimit: 100,
+  messagesUsed: 0,
+  messagesLimit: TIER_WINDOWS.free.maxMessages,
+  windowHours: TIER_WINDOWS.free.windowHours,
   loading: false,
   dialogOpen: false,
   initialized: false,
@@ -44,19 +68,24 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       });
       if (!res.ok) throw new Error(`Server ${res.status}`);
       const data = await res.json();
-      const tier = ["free", "pro", "max"].includes(data.tier) ? data.tier : "free";
+      const tier: Tier = ["free", "pro", "max"].includes(data.tier) ? data.tier : "free";
+      const cfg = TIER_WINDOWS[tier];
       set({
         tier,
-        usageToday: data.usageToday || 0,
-        dailyLimit: data.dailyLimit || 100,
+        messagesUsed: typeof data.messagesUsed === "number" ? data.messagesUsed : 0,
+        messagesLimit: typeof data.messagesLimit === "number" ? data.messagesLimit : cfg.maxMessages,
+        windowHours: typeof data.windowHours === "number" ? data.windowHours : cfg.windowHours,
         initialized: true,
         loading: false,
       });
     } catch (err: any) {
       // On failure, default to free — no privileges leak
+      const cfg = TIER_WINDOWS.free;
       set({
         tier: "free",
-        dailyLimit: 100,
+        messagesUsed: 0,
+        messagesLimit: cfg.maxMessages,
+        windowHours: cfg.windowHours,
         initialized: true,
         loading: false,
         error: err.message || "Failed to load subscription",
@@ -78,7 +107,13 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       if (!res.ok) return false;
       const data = await res.json();
       if (data.success) {
-        set({ tier: data.tier, dailyLimit: data.dailyLimit, dialogOpen: false });
+        const cfg = TIER_WINDOWS[tier];
+        set({
+          tier: data.tier,
+          messagesLimit: typeof data.messagesLimit === "number" ? data.messagesLimit : cfg.maxMessages,
+          windowHours: typeof data.windowHours === "number" ? data.windowHours : cfg.windowHours,
+          dialogOpen: false,
+        });
         return true;
       }
       return false;
@@ -87,7 +122,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     }
   },
 
-  checkAccess: async (modelId) => {
+  checkAccess: async (_modelId) => {
+    // Model gating is gone — all 5 models are available to all tiers.
+    // This now only checks the time-window rate limit server-side.
     const accessToken = getAccessToken();
     if (!accessToken) return { allowed: false, reason: "Not signed in" };
 
@@ -95,11 +132,18 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       const res = await fetch(API, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "check-access", model: modelId }),
+        body: JSON.stringify({ action: "check-access" }),
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) return { allowed: false, reason: "Server error" };
-      return await res.json();
+      const data = await res.json();
+      return {
+        allowed: !!data.allowed,
+        reason: data.reason,
+        messagesUsed: data.messagesUsed,
+        messagesLimit: data.messagesLimit,
+        resetsInMinutes: data.resetsInMinutes,
+      };
     } catch {
       return { allowed: false, reason: "Network error" };
     }
@@ -107,10 +151,3 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   setDialogOpen: (open) => set({ dialogOpen: open }),
 }));
-
-// Client-side helper for instant model gating in the dropdown
-export function canAccessModel(tier: Tier, modelId: string): boolean {
-  if (/-free$/.test(modelId) || modelId === "big-pickle") return true;
-  if (!/^(groq|google|mistral|openrouter|cerebras)\//.test(modelId)) return tier !== "free";
-  return tier === "pro" || tier === "max";
-}
