@@ -3,13 +3,15 @@
 import * as React from "react";
 import { Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PanelRightOpen, X } from "lucide-react";
+import { PanelRightOpen, X, Terminal, Sparkles, Keyboard } from "lucide-react";
 import { useOAuth } from "@/components/omega/hooks/use-oauth";
 import { useAuthStore } from "@/components/omega/store/auth-store";
 import { ChatSidebar } from "@/components/omega/chat/ChatSidebar";
 import { ChatArea } from "@/components/omega/chat/ChatArea";
 import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 import { SubscriptionDialog } from "@/components/omega/chat/SubscriptionDialog";
+import { PythonREPL } from "@/components/omega/chat/PythonREPL";
+import { KeyboardShortcutsDialog } from "@/components/omega/chat/KeyboardShortcuts";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +65,8 @@ function ChatShell() {
   const { ready } = useOAuth();
   const openLoginOverlay = useAuthStore((s) => s.openLoginOverlay);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [showREPL, setShowREPL] = React.useState(false);
+  const [showShortcuts, setShowShortcuts] = React.useState(false);
 
   // If bounced back from landing with ?needAuth=1, open the login overlay.
   React.useEffect(() => {
@@ -84,6 +88,32 @@ function ChatShell() {
       return () => clearTimeout(t);
     }
   }, [ready, user]);
+
+  // Global keyboard shortcuts for panels
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Ctrl+Shift+I: Toggle Python REPL
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "i") {
+        e.preventDefault();
+        setShowREPL(prev => !prev);
+      }
+      // ?: Show keyboard shortcuts
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
+      // Escape: Close panels
+      if (e.key === "Escape" && showREPL) {
+        e.preventDefault();
+        setShowREPL(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showREPL]);
 
   if (!ready) return <ChatLoader />;
 
@@ -166,6 +196,27 @@ function ChatShell() {
 
         <main className="flex min-w-0 flex-1 flex-col md:ml-0">
           <ChatArea />
+          {/* ── Floating panel buttons ──────────────────────────── */}
+          <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowREPL(true)}
+              className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
+              aria-label="Toggle Python REPL"
+              title="Python REPL (Ctrl+Shift+I)"
+            >
+              <Terminal className="size-4.5" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(true)}
+              className="inline-flex size-10 items-center justify-center rounded-xl bg-[var(--omega-bg-2)] border border-[var(--omega-glass-border)] shadow-lg text-[var(--omega-muted)] hover:text-[var(--omega-emerald)] hover:border-[var(--omega-emerald)] transition-all active:scale-95"
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="size-4.5" strokeWidth={2} />
+            </button>
+          </div>
         </main>
       </div>
 
@@ -173,6 +224,18 @@ function ChatShell() {
       <OmegaLogin />
       {/* ── Subscription dialog ── */}
       <SubscriptionDialog />
+
+      {/* ── Python REPL panel ── */}
+      <PythonREPL
+        isOpen={showREPL}
+        onClose={() => setShowREPL(false)}
+      />
+
+      {/* ── Keyboard shortcuts dialog ── */}
+      <KeyboardShortcutsDialog
+        open={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
     </div>
   );
 }
