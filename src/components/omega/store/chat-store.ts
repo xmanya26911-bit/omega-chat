@@ -262,6 +262,17 @@ export const useChatStore = create<ChatState>((set, get) => {
       });
       persistToLocal(get());
       triggerSync();
+      // Also sync immediately to Drive so reload doesn't restore old data
+      set({ driveStatus: "saving" });
+      const state = get();
+      driveSave({
+        sessions: state.sessions,
+        sessionOrder: state.sessionOrder,
+        activeSession: state.activeSession,
+        currentModel: state.currentModel,
+      }).then((ok) => {
+        set({ driveStatus: ok ? "connected" : "error", lastSynced: Date.now() });
+      });
     },
 
     deleteMessage: (sessionId, messageId) => {
@@ -281,6 +292,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       });
       persistToLocal(get());
       triggerSync();
+      // Also sync immediately to Drive
+      const state = get();
+      driveSave({
+        sessions: state.sessions,
+        sessionOrder: state.sessionOrder,
+        activeSession: state.activeSession,
+        currentModel: state.currentModel,
+      });
     },
 
     togglePin: (id) => {
@@ -375,15 +394,32 @@ export const useChatStore = create<ChatState>((set, get) => {
           currentModel: string;
         }>();
         if (data && data.sessions) {
-          set({
-            sessions: data.sessions,
-            sessionOrder: data.sessionOrder || [],
-            activeSession: data.activeSession || null,
-            currentModel: data.currentModel || DEFAULT_MODEL,
-            driveStatus: "connected",
-            lastSynced: Date.now(),
-          });
-          persistToLocal(get());
+          // Compare timestamps: keep whichever data is newer
+          const state = get();
+          const localMax = Math.max(
+            ...Object.values(state.sessions).map((s) => s.updatedAt),
+            0
+          );
+          const driveMax = Math.max(
+            ...Object.values(data.sessions).map((s) => s.updatedAt),
+            0
+          );
+          if (driveMax > localMax) {
+            // Drive has newer data — overwrite local
+            set({
+              sessions: data.sessions,
+              sessionOrder: data.sessionOrder || [],
+              activeSession: data.activeSession || null,
+              currentModel: data.currentModel || DEFAULT_MODEL,
+              driveStatus: "connected",
+              lastSynced: Date.now(),
+            });
+            persistToLocal(get());
+          } else {
+            // Local is newer or equal — keep local, push to Drive
+            set({ driveStatus: "connected", lastSynced: Date.now() });
+            triggerSync();
+          }
         } else {
           set({ driveStatus: "idle" });
         }

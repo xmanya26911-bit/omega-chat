@@ -85,8 +85,13 @@ export const useMemoryStore = create<MemoryState>()(
         try {
           const data = await loadMemoriesFromDrive<Memory[]>();
           if (data && data.length > 0) {
-            // Merge: Drive has priority (cross-device)
-            set({ memories: data });
+            // Only overwrite if Drive data is newer
+            const local = get().memories;
+            const localMax = Math.max(...local.map((m) => m.updatedAt), 0);
+            const driveMax = Math.max(...data.map((m) => m.updatedAt), 0);
+            if (driveMax > localMax) {
+              set({ memories: data });
+            }
           }
         } catch {}
       },
