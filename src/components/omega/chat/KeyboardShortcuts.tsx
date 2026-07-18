@@ -13,7 +13,7 @@ interface Shortcut {
 }
 
 const SHORTCUTS: Shortcut[] = [
-  { keys: ["Ctrl", "Enter"], description: "Send message", category: "Chat", icon: <Enter className="size-3.5" /> },
+  { keys: ["Ctrl", "Enter"], description: "Send message", category: "Chat", icon: <ArrowUp className="size-3.5 rotate-180" /> },
   { keys: ["Shift", "Enter"], description: "New line", category: "Chat", icon: <ArrowUp className="size-3.5 rotate-180" /> },
   { keys: ["Ctrl", "/"], description: "Commands menu", category: "Chat", icon: <Slash className="size-3.5" /> },
   { keys: ["Ctrl", "N"], description: "New chat", category: "Navigation", icon: <Plus className="size-3.5" /> },
