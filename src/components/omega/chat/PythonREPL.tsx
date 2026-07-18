@@ -2,21 +2,9 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Terminal, 
-  Play, 
-  Square, 
-  Trash2, 
-  Copy, 
-  Maximize2,
-  RotateCcw,
-  ChevronDown,
-  AlertCircle,
-  CheckCircle,
-  X,
-  Loader2
-} from "lucide-react";
+import { Terminal, Play, Square, Trash2, Copy, Maximize2, RotateCcw, X, Loader2, Plus, CheckCircle, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PythonREPLProps {
   isOpen: boolean;
