@@ -1,3 +1,7 @@
 .env*
 .vercel
 node_modules
+.next/
+next-env.d.ts
+*.log
+package-lock.json

@@ -121,6 +121,13 @@ function ChatShell() {
     <div
       className="relative flex h-[100dvh] w-screen overflow-hidden bg-[var(--omega-bg)] text-[var(--omega-fg)]"
     >
+      {/* Skip-to-content link — keyboard accessibility (WCAG 2.4.1) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:border focus:border-[var(--omega-emerald)]/40 focus:bg-[var(--omega-bg)] focus:px-4 focus:py-2 focus:text-sm focus:text-[var(--omega-emerald)]"
+      >
+        Skip to content
+      </a>
       {/* ── Static aurora background (lightweight, no canvas) ────────── */}
       <div
         aria-hidden
@@ -194,7 +201,7 @@ function ChatShell() {
           )}
         </AnimatePresence>
 
-        <main className="flex min-w-0 flex-1 flex-col md:ml-0">
+        <main id="main-content" className="flex min-w-0 flex-1 flex-col md:ml-0">
           <ChatArea />
           {/* ── Floating panel buttons ──────────────────────────── */}
           <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
