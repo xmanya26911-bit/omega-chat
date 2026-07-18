@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Download, Code, BarChart2, FileText, Sparkles } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Copy, Maximize2, Minimize2, Download, Code, BarChart2, FileText, Sparkles, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
