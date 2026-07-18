@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Keyboard, Command, ArrowUp, Enter, Slash, Delete, Search, Plus, FileDown, Settings, MessageSquare } from "lucide-react";
+import { X, Keyboard, Command, ArrowUp, Slash, Delete, Search, Plus, FileDown, Settings, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
