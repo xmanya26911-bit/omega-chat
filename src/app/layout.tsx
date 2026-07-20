@@ -51,9 +51,13 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: "/logo.svg",
-    apple: "/logo.svg",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/icon-192.png",
   },
+  manifest: "/manifest.json",
   openGraph: {
     title: "Omega Cloud — Free Multi-Model AI Chat",
     description:
@@ -108,6 +112,17 @@ export default function RootLayout({
       >
         {children}
         <Toaster />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: [
+              "if ('serviceWorker' in navigator) {",
+              "  window.addEventListener('load', () => {",
+              "    navigator.serviceWorker.register('/sw.js').catch(() => {});",
+              "  });",
+              "}",
+            ].join('\n'),
+          }}
+        />
       </body>
     </html>
   );
