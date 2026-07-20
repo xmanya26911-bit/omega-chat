@@ -6,7 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck, Trash2, Volume2 } from "lucide-react";
+import { Check, Copy, Edit3, RefreshCw, ThumbsUp, ThumbsDown, Share2, Pencil, X, CheckCheck, Trash2, Volume2, Code, Terminal } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ChatMessage } from "../store/chat-store";
 import { useChatStore } from "../store/chat-store";

@@ -12,6 +12,7 @@ import { OmegaLogin } from "@/components/omega/sections/OmegaLogin";
 import { SubscriptionDialog } from "@/components/omega/chat/SubscriptionDialog";
 import { PythonREPL } from "@/components/omega/chat/PythonREPL";
 import { KeyboardShortcutsDialog } from "@/components/omega/chat/KeyboardShortcuts";
+import { OmegaCursor } from "@/components/omega/cursor/OmegaCursor";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -232,6 +233,9 @@ function ChatShell() {
       <OmegaLogin />
       {/* ── Subscription dialog ── */}
       <SubscriptionDialog />
+
+      {/* ── Custom cursor ── */}
+      <OmegaCursor />
 
       {/* ── Python REPL panel ── */}
       <PythonREPL

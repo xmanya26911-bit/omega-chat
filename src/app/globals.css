@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -46,49 +45,56 @@
 }
 
 :root {
-  /* Omega cinematic palette — warm obsidian + aurora triad (emerald / amber / rose) */
-  --radius: 0.75rem;
+  --radius: 1rem;
 
-  /* Omega semantic tokens */
-  --omega-bg: oklch(0.085 0.008 264);
-  --omega-bg-2: oklch(0.115 0.012 268);
-  --omega-bg-3: oklch(0.05 0.006 264);
+  /* ── Omega deep space palette ─────────────────────────────────── */
+  --omega-bg: oklch(0.03 0.003 264);
+  --omega-bg-2: oklch(0.055 0.005 268);
+  --omega-bg-3: oklch(0.035 0.002 264);
   --omega-fg: oklch(0.97 0.005 90);
-  --omega-fg-dim: oklch(0.78 0.01 90);
-  --omega-muted: oklch(0.6 0.012 264);
+  --omega-fg-dim: oklch(0.72 0.01 90);
+  --omega-muted: oklch(0.55 0.012 264);
 
-  /* Aurora triad — luminous, NOT blue/indigo */
-  --omega-emerald: oklch(0.82 0.17 162);   /* primary accent — jade */
+  /* ── Luxury accent — Liquid Emerald ───────────────────────────── */
+  --omega-emerald: oklch(0.82 0.17 162);
   --omega-emerald-soft: oklch(0.78 0.14 168);
-  --omega-amber: oklch(0.85 0.15 82);      /* warm gold */
-  --omega-rose: oklch(0.7 0.21 14);        /* magenta-rose */
-  --omega-cyan: oklch(0.8 0.12 195);       /* aurora cyan (sparingly) */
+  --omega-emerald-glow: oklch(0.82 0.17 162 / 0.15);
+  --omega-amber: oklch(0.85 0.15 82);
+  --omega-rose: oklch(0.7 0.21 14);
+  --omega-cyan: oklch(0.8 0.12 195);
 
-  /* Glass + borders */
-  --omega-glass: oklch(0.16 0.01 264 / 0.55);
-  --omega-glass-2: oklch(0.2 0.012 264 / 0.42);
-  --omega-glass-border: oklch(0.92 0.02 90 / 0.12);
-  --omega-glass-highlight: oklch(1 0 0 / 0.06);
-  --omega-ring: oklch(0.82 0.17 162 / 0.45);
+  /* ── Luxury Glass System ──────────────────────────────────────── */
+  --omega-glass: oklch(0.12 0.008 264 / 0.6);
+  --omega-glass-2: oklch(0.16 0.01 264 / 0.45);
+  --omega-glass-border: oklch(0.92 0.02 90 / 0.06);
+  --omega-glass-highlight: oklch(1 0 0 / 0.04);
+  --omega-ring: oklch(0.82 0.17 162 / 0.35);
 
-  /* shadcn compatibility (mapped to omega) */
+  /* ── Shadows ──────────────────────────────────────────────────── */
+  --omega-shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --omega-shadow-md: 0 8px 32px rgba(0,0,0,0.4);
+  --omega-shadow-lg: 0 20px 60px -12px rgba(0,0,0,0.5);
+  --omega-shadow-xl: 0 40px 80px -16px rgba(0,0,0,0.6);
+  --omega-shadow-glow: 0 0 40px -8px var(--omega-emerald-glow);
+
+  /* shadcn compatibility */
   --background: var(--omega-bg);
   --foreground: var(--omega-fg);
   --card: var(--omega-glass);
   --card-foreground: var(--omega-fg);
-  --popover: oklch(0.13 0.012 264 / 0.92);
+  --popover: oklch(0.08 0.008 264 / 0.92);
   --popover-foreground: var(--omega-fg);
   --primary: var(--omega-emerald);
-  --primary-foreground: oklch(0.06 0.01 264);
-  --secondary: oklch(0.18 0.012 264 / 0.6);
+  --primary-foreground: oklch(0.03 0.003 264);
+  --secondary: oklch(0.12 0.008 264 / 0.6);
   --secondary-foreground: var(--omega-fg);
-  --muted: oklch(0.2 0.012 264 / 0.6);
+  --muted: oklch(0.12 0.008 264 / 0.6);
   --muted-foreground: var(--omega-muted);
-  --accent: oklch(0.82 0.17 162 / 0.16);
+  --accent: var(--omega-emerald-glow);
   --accent-foreground: var(--omega-fg);
-  --destructive: oklch(0.7 0.21 14);
+  --destructive: var(--omega-rose);
   --border: var(--omega-glass-border);
-  --input: oklch(0.92 0.02 90 / 0.14);
+  --input: oklch(0.92 0.02 90 / 0.08);
   --ring: var(--omega-ring);
   --chart-1: var(--omega-emerald);
   --chart-2: var(--omega-amber);
@@ -98,26 +104,18 @@
   --sidebar: var(--omega-bg-2);
   --sidebar-foreground: var(--omega-fg);
   --sidebar-primary: var(--omega-emerald);
-  --sidebar-primary-foreground: oklch(0.06 0.01 264);
-  --sidebar-accent: oklch(0.2 0.012 264 / 0.6);
+  --sidebar-primary-foreground: oklch(0.03 0.003 264);
+  --sidebar-accent: oklch(0.12 0.008 264 / 0.6);
   --sidebar-accent-foreground: var(--omega-fg);
   --sidebar-border: var(--omega-glass-border);
   --sidebar-ring: var(--omega-ring);
 }
 
-.dark {
-  --background: var(--omega-bg);
-  --foreground: var(--omega-fg);
-}
+.dark { --background: var(--omega-bg); --foreground: var(--omega-fg); }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
+  * { @apply border-border outline-ring/50; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
   body {
     @apply bg-background text-foreground;
     background-color: var(--omega-bg);
@@ -126,44 +124,56 @@
   }
 }
 
-/* ===== Omega cinematic utility layer ===== */
+/* ===== Omega luxury utilities ===== */
 @layer utilities {
-  .font-display { font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif; }
-  .font-mono { font-family: var(--font-mono), ui-monospace, monospace; }
+  .font-display { font-family: var(--font-display), ui-serif, Georgia, serif; }
+  .font-mono { font-family: var(--font-mono), ui-monospace, 'JetBrains Mono', monospace; }
 
   .omega-text-gradient {
     background: linear-gradient(105deg,
-      var(--omega-fg) 0%,
-      var(--omega-fg) 40%,
-      var(--omega-emerald) 62%,
-      var(--omega-amber) 82%,
+      var(--omega-fg) 0%, var(--omega-fg) 35%,
+      var(--omega-emerald) 55%,
+      var(--omega-amber) 75%,
       var(--omega-rose) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
   }
 
   .omega-text-aurora {
     background: linear-gradient(100deg,
-      var(--omega-emerald), var(--omega-cyan), var(--omega-amber), var(--omega-rose), var(--omega-emerald));
+      var(--omega-emerald), var(--omega-cyan), var(--omega-amber),
+      var(--omega-rose), var(--omega-emerald));
     background-size: 280% 280%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
     animation: omega-aurora-shift 14s ease-in-out infinite;
+  }
+
+  .omega-text-emerald {
+    color: var(--omega-emerald);
+    text-shadow: 0 0 40px var(--omega-emerald-glow);
   }
 
   .omega-glass {
     background: var(--omega-glass);
     border: 1px solid var(--omega-glass-border);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow:
+      inset 0 1px 0 0 var(--omega-glass-highlight),
+      inset 0 0 0 1px oklch(1 0 0 / 0.015),
+      var(--omega-shadow-lg);
+  }
+
+  .omega-glass-strong {
+    background: oklch(0.08 0.006 264 / 0.7);
+    border: 1px solid var(--omega-glass-border);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
     box-shadow:
       inset 0 1px 0 0 var(--omega-glass-highlight),
       inset 0 0 0 1px oklch(1 0 0 / 0.02),
-      0 20px 60px -20px oklch(0.02 0 0 / 0.6);
+      var(--omega-shadow-xl);
   }
 
   .omega-glass-thin {
@@ -173,23 +183,37 @@
     -webkit-backdrop-filter: blur(14px) saturate(130%);
   }
 
-  .omega-tilt {
-    transform-style: preserve-3d;
-    will-change: transform;
+  .omega-glow-emerald {
+    box-shadow: 0 0 30px -6px oklch(0.82 0.17 162 / 0.3),
+                0 0 60px -12px oklch(0.82 0.17 162 / 0.15);
+  }
+  .omega-glow-amber {
+    box-shadow: 0 0 30px -6px oklch(0.85 0.15 82 / 0.3),
+                0 0 60px -12px oklch(0.85 0.15 82 / 0.15);
   }
 
+  .omega-tilt { transform-style: preserve-3d; will-change: transform; }
   .omega-preserve-3d { transform-style: preserve-3d; }
   .omega-backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .omega-perspective { perspective: 1000px; }
+  .omega-perspective-near { perspective: 600px; }
 
-  .omega-glow-emerald { box-shadow: 0 0 40px -8px oklch(0.82 0.17 162 / 0.5); }
-  .omega-glow-amber { box-shadow: 0 0 40px -8px oklch(0.85 0.15 82 / 0.45); }
-
-  .omega-noise {
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  .omega-noise::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+    opacity: 0.4;
+    mix-blend-mode: overlay;
   }
 
   .omega-scrollbar-hide::-webkit-scrollbar { display: none; }
   .omega-scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .omega-transition { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .omega-transition-slow { transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
 }
 
 /* ===== Keyframes ===== */
@@ -198,44 +222,58 @@
   50% { background-position: 100% 50%; }
 }
 
-@keyframes omega-float-y {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-14px); }
+@keyframes omega-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
 }
 
-@keyframes omega-spin-slow {
-  to { transform: rotate(360deg); }
+@keyframes omega-float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(1deg); }
+  66% { transform: translateY(4px) rotate(-0.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
 }
+
+@keyframes omega-spin-slow { to { transform: rotate(360deg); } }
 
 @keyframes omega-pulse-ring {
   0% { transform: scale(0.8); opacity: 0.7; }
   100% { transform: scale(2.2); opacity: 0; }
 }
 
-/* Custom scrollbar for the whole page */
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-track { background: oklch(0.05 0 0); }
+@keyframes omega-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes omega-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes omega-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.82 0.17 162 / 0.28);
+  background: oklch(0.82 0.17 162 / 0.2);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: oklch(0.82 0.17 162 / 0.5); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.82 0.17 162 / 0.4); background-clip: padding-box; }
 
-::selection { background: oklch(0.82 0.17 162 / 0.3); color: var(--omega-fg); }
+::selection { background: oklch(0.82 0.17 162 / 0.25); color: var(--omega-fg); }
 
-/* Hide native cursor when custom cursor active (only on fine pointers) */
 @media (pointer: fine) {
   .omega-custom-cursor-active * { cursor: none !important; }
-}
-
-/* Always show native cursor on auth pages regardless of custom cursor state */
-@media (pointer: fine) {
   [data-omega-auth="true"] * { cursor: auto !important; }
 }
 
-/* Respect reduced motion globally */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -244,3 +282,8 @@
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+@keyframes pulse { 50% { opacity: 0.5; } }
+@keyframes bounce { 0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0,0,0.2,1); } }
