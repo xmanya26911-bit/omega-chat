@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Settings, Code, Bot, Save, Trash2, Plus, ChevronDown, ChevronRight, Star } from "lucide-react";
+import { X, Settings, Code, Bot, Save, Trash2, Plus, ChevronDown, ChevronRight, Star, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -223,7 +223,42 @@ export function CustomInstructionsDialog({
           </div>
 
           {/* Add new */}
-          <div className="p-4 pt-0">
+          <div className="p-4 pt-0 space-y-2">
+            {/* Presets */}
+            <details className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-xs text-[var(--omega-muted)] hover:text-[var(--omega-fg-dim)] transition mb-2">
+                <Sparkles className="size-3.5" />
+                <span>Load a preset</span>
+                <ChevronRight className="size-3 ml-auto transition group-open:rotate-90" />
+              </summary>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {[
+                  { name: "Code Expert", prompt: "You are a senior software engineer. Write clean, efficient, well-documented code. Focus on best practices, edge cases, and performance. Always explain your reasoning.", temp: 0.3 },
+                  { name: "Creative Writer", prompt: "You are a creative writing assistant. Help craft engaging stories, poems, and content. Use vivid language and compelling narrative structures. Be imaginative.", temp: 0.9 },
+                  { name: "Tutor", prompt: "You are a patient tutor who explains concepts clearly. Break down complex topics into simple steps. Use analogies and examples. Ask questions to confirm understanding.", temp: 0.5 },
+                  { name: "Debate Partner", prompt: "You are a thoughtful debate partner. Present balanced arguments, challenge assumptions, and cite evidence. Be respectful but rigorous. Play devil's advocate when useful.", temp: 0.8 },
+                  { name: "Translator", prompt: "You are a professional translator. Translate text accurately while preserving tone, context, and cultural nuances. Provide alternative translations when ambiguous.", temp: 0.4 },
+                  { name: "Summarizer", prompt: "You are an expert at distilling information. Provide concise, structured summaries with key points, action items, and relevant context. Omit fluff.", temp: 0.3 },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => {
+                      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+                      store.add({
+                        id,
+                        name: preset.name,
+                        systemPrompt: preset.prompt,
+                        temperature: preset.temp,
+                      });
+                    }}
+                    className="text-left px-2.5 py-2 rounded-lg border border-[var(--omega-glass-border)] bg-[var(--omega-bg)] hover:border-[var(--omega-emerald)] hover:bg-[oklch(0.82_0.17_162_/_0.04)] transition text-[11px] leading-tight"
+                  >
+                    <span className="font-medium text-[var(--omega-fg)] block mb-0.5">{preset.name}</span>
+                    <span className="text-[var(--omega-fg-dim)] line-clamp-2">{preset.prompt}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
             <button
               onClick={() => {
                 const id = Date.now().toString(36);

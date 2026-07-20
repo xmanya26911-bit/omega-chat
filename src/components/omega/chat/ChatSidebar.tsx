@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cloud, CloudOff, LogOut, Plus, Search, X, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List, MessageSquare } from "lucide-react";
+import { Cloud, CloudOff, LogOut, Plus, Search, X, Download, Settings, Brain, PanelRightClose, Star, PanelRightOpen, List, MessageSquare, Share2, Image as ImageIcon } from "lucide-react";
 import { useChatStore } from "../store/chat-store";
 import { useAuthStore } from "../store/auth-store";
 import { OmegaButton } from "../ui/OmegaButton";
@@ -13,6 +13,7 @@ import { MemoryManager } from "./MemoryManager";
 import { PluginPanel } from "../plugins/PluginPanel";
 import { ChatGPTImport } from "./ChatGPTImport";
 import { useMemoryStore } from "../store/memory-store";
+import { ImageGalleryDialog } from "./ImageGalleryDialog";
 import { usePrefsStore } from "../store/prefs-store";
 import { usePluginStore } from "../store/plugin-store";
 
@@ -201,6 +202,9 @@ export function ChatSidebar() {
   const [showMemory, setShowMemory] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [showImport, setShowImport] = React.useState(false);
+  const [showGallery, setShowGallery] = React.useState(false);
+  const [sharing, setSharing] = React.useState(false);
+  const [shareUrl, setShareUrl] = React.useState<string | null>(null);
 
   const hydratePrefs = usePrefsStore((s) => s.hydrate);
   const syncFromDrive = useMemoryStore((s) => s.syncFromDrive);
@@ -253,6 +257,35 @@ export function ChatSidebar() {
     a.download = `${sess.title.replace(/[^a-zA-Z0-9 ]/g, "").trim().slice(0, 40) || "omega-chat"}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  }, [activeSession, sessions]);
+
+  // Share active session
+  const handleShareSession = React.useCallback(() => {
+    const id = activeSession;
+    if (!id || !sessions[id]) return;
+    const sess = sessions[id];
+    setSharing(true);
+    try {
+      const shareData = {
+        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+        title: sess.title,
+        model: sess.currentModel || "unknown",
+        messages: sess.messages.slice(0, 50).map((m: any) => ({
+          role: m.role,
+          content: typeof m.content === "string" ? m.content.slice(0, 16000) : "",
+        })),
+        created: Date.now(),
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      };
+      const stored = JSON.parse(localStorage.getItem("omega_shared_sessions") || "{}");
+      stored[shareData.id] = shareData;
+      localStorage.setItem("omega_shared_sessions", JSON.stringify(stored));
+      const url = window.location.origin + "/shared?id=" + shareData.id;
+      navigator.clipboard.writeText(url);
+      setShareUrl(url);
+      setTimeout(() => setShareUrl(null), 3000);
+    } catch {}
+    setSharing(false);
   }, [activeSession, sessions]);
 
   const displayName = user?.name || user?.email || "Omega User";
@@ -527,16 +560,52 @@ export function ChatSidebar() {
           type="button"
           onClick={() => setShowImport(true)}
           className={cn(
-            "omega-glass-thin flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left",
-            "transition-all duration-200 text-xs font-medium",
-            "hover:bg-[oklch(0.82_0.17_162_/_0.1)] hover:text-[var(--omega-emerald)]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
-            "text-[var(--omega-fg-dim)]"
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs",
+            "text-[var(--omega-fg-dim)] transition-colors duration-200",
+            "hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]"
           )}
         >
-          <MessageSquare className="size-4" strokeWidth={2} />
+          <Download className="size-3.5" strokeWidth={2} />
           Import from ChatGPT
         </button>
+      </div>
+
+      {/* ── Image gallery ──────────────────────────────────────── */}
+      <div className="px-3 pb-1">
+        <button
+          type="button"
+          onClick={() => setShowGallery(true)}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs",
+            "text-[var(--omega-fg-dim)] transition-colors duration-200",
+            "hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]"
+          )}
+        >
+          <ImageIcon className="size-3.5" strokeWidth={2} />
+          Image gallery
+        </button>
+      </div>
+
+      {/* ── Share active session ───────────────────────────────── */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={handleShareSession}
+          disabled={sharing}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs",
+            "text-[var(--omega-fg-dim)] transition-colors duration-200",
+            "hover:bg-[var(--omega-glass-border)] hover:text-[var(--omega-fg)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omega-ring)]",
+            sharing && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          <Share2 className="size-3.5" strokeWidth={2} />
+          {sharing ? "Creating link…" : shareUrl ? "Link copied!" : "Share session"}
+        </button>
+      </div>
       </div>
 
       {/* ── Export chat ──────────────────────────────────────────── */}
@@ -620,6 +689,9 @@ export function ChatSidebar() {
 
       {/* Settings dialog — always rendered */}
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* Image gallery dialog */}
+      <ImageGalleryDialog open={showGallery} onClose={() => setShowGallery(false)} />
 
       {/* ChatGPT Import dialog */}
       <ChatGPTImport open={showImport} onClose={() => setShowImport(false)} />

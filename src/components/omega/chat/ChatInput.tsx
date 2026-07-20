@@ -21,6 +21,9 @@ import { useChatStore } from "../store/chat-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getAccessToken } from "@/lib/access-token";
 import { cn } from "@/lib/utils";
+import { useImageGallery } from "@/lib/image-gallery";
+import { ImageGalleryDialog } from "./ImageGalleryDialog";
+import { analyzeImage } from "@/lib/analyze-image";
 
 const MAX_HEIGHT = 200;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -149,9 +152,11 @@ function ToolbarButton({
 function AttachmentChip({
   attachment,
   onRemove,
+  onAnalyze,
 }: {
   attachment: FileAttachment;
   onRemove: () => void;
+  onAnalyze?: (attachment: FileAttachment) => void;
 }) {
   return (
     <motion.div
@@ -182,6 +187,17 @@ function AttachmentChip({
       <span className="shrink-0 font-mono text-[10px] text-[var(--omega-muted)]">
         {formatSize(attachment.size)}
       </span>
+      {(attachment.type === "image" && onAnalyze) ? (
+        <button
+          type="button"
+          onClick={() => onAnalyze(attachment)}
+          className="ml-0.5 inline-flex size-4 items-center justify-center rounded text-[var(--omega-emerald)] hover:bg-[oklch(0.82_0.17_162_/_0.12)] transition-colors"
+          aria-label={`Analyze ${attachment.name}`}
+          title="Analyze image"
+        >
+          <Sparkles className="size-3" strokeWidth={2} />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onRemove}
@@ -244,6 +260,7 @@ export function ChatInput() {
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [voiceMode, setVoiceMode] = React.useState(false);
   const [undoData, setUndoData] = React.useState<{ text: string; attachments: FileAttachment[] } | null>(null);
+  const [showGallery, setShowGallery] = React.useState(false);
   const undoRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -255,6 +272,7 @@ export function ChatInput() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const toggleSearch = useChatStore((s) => s.toggleSearch);
+  const gallery = useImageGallery();
 
   // ── Auto-resize ──────────────────────────────────────────────
   const autoResize = React.useCallback(() => {
@@ -541,6 +559,8 @@ export function ChatInput() {
       });
       const data = await res.json();
       if (data.url) {
+        // Save to gallery
+        gallery.addRecord({ prompt, url: data.url });
         // Add as image attachment
         const id = uid();
         setAttachments((prev) => [...prev, {
@@ -560,6 +580,36 @@ export function ChatInput() {
       setIsGeneratingImage(false);
     }
   };
+
+  // ── Image analysis ──────────────────────────────────────────
+  const [analyzingId, setAnalyzingId] = React.useState<string | null>(null);
+  const handleAnalyzeImage = React.useCallback(async (attachment: FileAttachment) => {
+    if (!attachment.content || analyzingId) return;
+    setAnalyzingId(attachment.id);
+    try {
+      const accessToken = getAccessToken();
+      if (!accessToken) {
+        setText((prev) => prev + "\n\n⚠️ Not authenticated to analyze images");
+        return;
+      }
+      const description = await analyzeImage(attachment.content, "Describe this image in detail");
+      // Insert the analysis as a message
+      setText((prev) => {
+        const newText = prev ? prev + "\n\n---" : "";
+        return newText + `\n\n**Image analysis:**\n${description}`;
+      });
+      // Auto-submit after a short delay
+      setTimeout(() => {
+        if (textareaRef.current) {
+          handleSubmit();
+        }
+      }, 300);
+    } catch (err) {
+      setText((prev) => prev + `\n\n⚠️ Analysis failed: ${(err as Error).message}`);
+    } finally {
+      setAnalyzingId(null);
+    }
+  }, [analyzingId, handleSubmit]);
 
   // ── Voice input ─────────────────────────────────────────────
   const recognitionRef = React.useRef<any>(null);
@@ -673,6 +723,7 @@ export function ChatInput() {
                 key={att.id}
                 attachment={att}
                 onRemove={() => removeAttachment(att.id)}
+                onAnalyze={handleAnalyzeImage}
               />
             ))}
           </motion.div>
@@ -777,6 +828,19 @@ export function ChatInput() {
             ) : (
               <ImageIcon className="size-4" strokeWidth={2} />
             )}
+          </ToolbarButton>
+
+          <ToolbarButton
+            aria-label="Image gallery"
+            tooltip={`Image gallery${gallery.records.length > 0 ? ` (${gallery.records.length})` : ""}`}
+            onClick={() => setShowGallery(true)}
+          >
+            <span className="relative flex items-center justify-center">
+              <ImageIcon className="size-4" strokeWidth={2} />
+              {gallery.records.length > 0 && (
+                <span className="absolute -top-1 -right-1 size-2 rounded-full bg-[var(--omega-emerald)]" />
+              )}
+            </span>
           </ToolbarButton>
 
           <ToolbarButton
@@ -892,12 +956,21 @@ export function ChatInput() {
 
       {/* helper hint */}
       <div className="mt-1.5 px-1 text-center font-mono text-[10px] text-[var(--omega-muted)] hidden sm:block">
-        <kbd className="font-mono">Enter</kbd> to send ·{" "}
-        <kbd className="font-mono">Shift+Enter</kbd> for newline ·{" "}
+        <kbd className="font-mono">Enter</kbd> to send ·{' '}
+        <kbd className="font-mono">Shift+Enter</kbd> for newline ·{' '}
         drag & drop files
       </div>
+
+      {/* Image gallery dialog */}
+      <ImageGalleryDialog
+        open={showGallery}
+        onClose={() => setShowGallery(false)}
+        onRegenerate={(prompt) => {
+          setText(prompt);
+          setShowGallery(false);
+          setTimeout(() => handleGenerateImage(), 100);
+        }}
+      />
     </div>
   );
 }
-
-export default ChatInput;
